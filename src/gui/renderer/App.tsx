@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAnimationTick } from '../../hooks/useAnimationTick.js';
 import { useTransitions } from '../../hooks/useTransitions.js';
 import type { Agent } from '../../types/agent.js';
-import type { CuseBridge, GuiEnvironment } from '../ipc.js';
+import { LEADER_TAB_ID, type CuseBridge, type GuiEnvironment } from '../ipc.js';
 import type { LeaderStartup } from '../leaderStartup.js';
 import { CenterPane, type TerminalTab } from './components/CenterPane/index.js';
 import { PreviewPane, type PreviewRequest } from './components/PreviewPane/index.js';
@@ -23,8 +23,8 @@ const leaderNotices = (startup: LeaderStartup | undefined): readonly string[] =>
   ...(startup?.kind === 'ready' ? startup.warnings : []),
 ];
 
-/** 指揮役のタブの ID。指揮役は 1 人なので固定にする。 */
-export const LEADER_TAB_ID = 'leader';
+/** 指揮役のタブの ID（main が会話の画面から送る先として使うので ipc.ts に置く）。 */
+export { LEADER_TAB_ID } from '../ipc.js';
 
 interface AppProps {
   readonly environment: GuiEnvironment;

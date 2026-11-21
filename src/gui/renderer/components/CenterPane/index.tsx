@@ -1,10 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { LEADER_GLOVE_WIDTH, getFrame, getLeaderFrame, isBatonRow } from '../../../../shared/characters.js';
 import { STATE_LABELS_JA } from '../../../../shared/stateLabels.js';
 import type { Agent } from '../../../../types/agent.js';
 import type { CuseBridge } from '../../../ipc.js';
 import type { LeaderStartup } from '../../../leaderStartup.js';
 import type { TerminalLink } from '../../../../shared/terminalLinks.js';
+import { ConversationView } from '../ConversationView/index.js';
 import { TerminalView } from '../TerminalView/index.js';
 
 /**
@@ -195,6 +196,10 @@ export const CenterPane = ({
   const active = tabs.find((tab) => tab.tabId === activeTabId) ?? null;
   const agent = active === null ? undefined : agents.find((a) => a.sessionId === active.sessionId);
   const state = agent?.state ?? 'unknown';
+  // 指揮役は、既定で会話の画面を出す。承認に答えるときや細かい操作は「端末」（Claude Code の画面）で行う
+  const [leaderView, setLeaderView] = useState<'chat' | 'terminal'>('chat');
+  const leaderTab = tabs.find((tab) => tab.role === 'leader');
+  const leaderAgent = leaderTab === undefined ? undefined : agents.find((a) => a.sessionId === leaderTab.sessionId);
 
   return (
     <section className="center-pane" aria-label="会話">
@@ -228,11 +233,28 @@ export const CenterPane = ({
                 {active.role === 'leader' ? '・編集ツールなし' : ''}
               </div>
             </div>
+            {active.role === 'leader' ? (
+              <div className="view-toggle" role="group" aria-label="見せ方">
+                {(['chat', 'terminal'] as const).map((view) => (
+                  <button
+                    type="button"
+                    key={view}
+                    aria-pressed={leaderView === view}
+                    className={leaderView === view ? 'view-toggle__button view-toggle__button--on' : 'view-toggle__button'}
+                    onClick={() => {
+                      setLeaderView(view);
+                    }}
+                  >
+                    {view === 'chat' ? '会話' : '端末'}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </header>
           {active.role === 'leader' && firstRequest ? (
             <div className="first-request" role="note">
               <strong>ここから依頼します。</strong>
-              下の指揮役（Claude Code）に、やってほしいことを書いて Enter を押してください。
+              下の入力欄に、やってほしいことを書いて Enter で指揮役に送ってください。
               <span className="first-request__example">
                 例: 「~/work/app の README の誤字を直して、テストも足して。終わったら差分を見せて」
               </span>
@@ -275,12 +297,27 @@ export const CenterPane = ({
         </>
       )}
       <div className="center-pane__terminals">
+        {leaderTab === undefined ? null : (
+          <ConversationView
+            bridge={bridge}
+            sessionId={leaderTab.sessionId}
+            state={leaderAgent?.state ?? 'unknown'}
+            active={leaderTab.tabId === activeTabId && leaderView === 'chat'}
+            onShowTerminal={() => {
+              setLeaderView('terminal');
+            }}
+            onLink={onLink === undefined ? undefined : (link) => {
+              onLink(leaderTab, link);
+            }}
+          />
+        )}
         {tabs.map((tab) => (
           <SessionTerminal
             key={tab.tabId}
             bridge={bridge}
             tab={tab}
-            active={tab.tabId === activeTabId}
+            // 指揮役の端末は、会話の画面を出している間も裏でつないだままにする（会話から送る先になる）
+            active={tab.tabId === activeTabId && (tab.role !== 'leader' || leaderView === 'terminal')}
             onLink={onLink}
           />
         ))}

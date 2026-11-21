@@ -123,6 +123,11 @@ cuse が Claude Code の設定（`~/.claude.json`）に信頼を書き込むこ�
 `claude` の失敗の理由は標準エラーから取る（`toCommandError`）。execFile の `Command failed: <コマンド全体>` には
 指揮役のトークンや心得の全文が入るので、画面やログにそのまま出さない。
 
+指揮役のタブは既定で会話の画面（`ConversationView`。transcript を `src/shared/conversation.ts` で会話の並びに直す）を出し、
+入力欄から送った文は main が指揮役の端末へ書き込む（`src/gui/leaderInput.ts`）。指揮役が依頼を待っているときだけ送り、
+承認待ち・作業中は送らない（Enter が権限の確認への返事になるため。安全の約束 1）。送る先は renderer から受け取らず、
+指揮役のタブが台帳の指揮役に attach しているときだけ書き込む。承認は人が「端末」に切り替えて Claude Code の画面で行う。
+
 埋め込み端末（node-pty）で動かすのは `claude attach <短縮 ID>` だけ。相手は main が台帳と一覧から決め（`src/gui/attachTarget.ts`）、
 renderer から来た値でコマンドを組み立てない。タブやウィンドウを閉じても attach を切るだけで、セッションは止めない。
 node-pty はネイティブモジュール。`.app` には macOS 用の prebuild だけを入れる（`gui:package`。asar にはしない）。
