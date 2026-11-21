@@ -1,6 +1,6 @@
 {
   "name": "cuse",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "1 つの Claude Code セッション（指揮役）が、同じマシンのほかの Claude Code セッション（配下）を見守り・指揮するための CLI とデスクトップアプリ",
   "type": "module",
   "main": "dist/gui/main.js",
@@ -24,7 +24,7 @@
     "start": "node dist/cli.js",
     "gui": "ELECTRON_RUN_AS_NODE= electron dist/gui/main.js",
     "gui:dev": "npm run build && npm run gui",
-    "gui:package": "npm run build && chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper && electron-packager . --name=cuse --app-bundle-id=io.github.naokiishimura.cuse --out=release --overwrite --asar.unpackDir=node_modules/node-pty --ignore=\"^/(?!dist($|/)|prompts($|/)|skill($|/)|package\\.json$|node_modules($|/node-pty($|/)))\" --ignore=\"^/node_modules/node-pty/(deps|third_party|src|build|scripts|node-addon-api|prebuilds/win32)\"",
+    "gui:package": "npm run build && chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper && electron-packager . --name=cuse --app-bundle-id=io.github.naokiishimura.cuse --out=release --overwrite --no-asar --ignore=\"^/(?!dist($|/)|prompts($|/)|skill($|/)|package\\.json$|node_modules($|/(node-pty|meow)($|/)))\" --ignore=\"^/node_modules/node-pty/(deps|third_party|src|build|scripts|node-addon-api|prebuilds/win32)\"",
     "postgui:package": "for app in release/cuse-darwin-*/cuse.app; do codesign --force --deep --sign - \"$app\" && codesign --verify --deep --strict \"$app\" || exit 1; done",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.gui.json"

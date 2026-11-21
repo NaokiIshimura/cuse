@@ -5,7 +5,10 @@ Claude Code がこのリポジトリで作業するときの指針。
 ## このツールについて
 
 cuse は、1 つの Claude Code セッション（指揮役）が、同じマシンのほかの Claude Code セッション（配下）を
-起動・監視・指示・回収・停止できるようにする CLI と、人が見るデスクトップアプリ（Electron）。
+起動・監視・指示・回収・停止できるようにするデスクトップアプリ（Electron）。配るのは `cuse.app` だけで、CLI は配らない。
+指揮役が Bash から使う `cuse` コマンドは、アプリが開くたびに `~/.cuse/bin/cuse` に置く（`src/gui/cuseShim.ts`）。
+中身はアプリの中の `dist/cli.js` を、アプリ自身の Electron を `ELECTRON_RUN_AS_NODE=1` で動かして実行するだけ。
+そのため `.app` は asar にしない（`--no-asar`）。CLI が読む `node_modules/meow` と、端末の `node_modules/node-pty` を `.app` に入れる。
 何をどう作るかは `docs/HANDOFF.md`、設計の理由は `docs/cuse 企画書（単体ツール版）.md` にある。
 
 いまは **第 2 段階（v0.2.0、指揮）**。`start` / `spawn` / `prompt` / `wait` / `kill`、台帳の書き込み、指揮役のトークン、
@@ -35,8 +38,7 @@ npm run gui:package # .app にパッケージ化（macOS。ad-hoc 署名まで�
 
 ## リリース
 
-`main` へマージすると `.github/workflows/release.yml` が CLI の npm パッケージ（`cuse-<version>.tgz`）と
-arm64 / x64 の `.app` をビルドし、`package.json` の `version` に対応するタグ（`v<version>`）が未公開なら Releases へ公開する。
+`main` へマージすると `.github/workflows/release.yml` が arm64 / x64 の `.app` をビルドし、`package.json` の `version` に対応するタグ（`v<version>`）が未公開なら Releases へ公開する。
 既に公開済みならリリースは作らず、実行ログの artifact にだけ残す。
 **配布したいときは `package.json` の `version` を上げてからマージする。**
 README のインストール手順は `releases/latest/download/` のバージョンを含まない名前を指すので、`version` を上げても書き換えなくてよい。
@@ -110,7 +112,7 @@ cuse が Claude Code の設定（`~/.claude.json`）に信頼を書き込むこ�
 
 埋め込み端末（node-pty）で動かすのは `claude attach <短縮 ID>` だけ。相手は main が台帳と一覧から決め（`src/gui/attachTarget.ts`）、
 renderer から来た値でコマンドを組み立てない。タブやウィンドウを閉じても attach を切るだけで、セッションは止めない。
-node-pty はネイティブモジュール。`.app` には macOS 用の prebuild だけを入れ、asar の外（`app.asar.unpacked`）に置く（`gui:package`）。
+node-pty はネイティブモジュール。`.app` には macOS 用の prebuild だけを入れる（`gui:package`。asar にはしない）。
 npm で入れた node-pty は `prebuilds/darwin-*/spawn-helper` の実行権限が落ちていることがあり（既知の不具合）、
 そのままだと端末が起きずに真っ暗になる。`gui:package` で `chmod +x` してから組み、main も端末を起こす前に
 `ensureSpawnHelperExecutable`（`src/core/ptyHelper.ts`）で確かめる。端末を起こせなかった理由は必ず画面に出す。

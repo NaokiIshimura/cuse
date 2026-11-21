@@ -782,3 +782,11 @@ button {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* 信頼の端末が指揮役ではないことを、枠のすぐ上に書く */
+.trust__terminal-label {
+  margin: 0 0 -6px;
+  color: var(--ink-yellow);
+  font-size: 12px;
+  font-weight: 700;
+}

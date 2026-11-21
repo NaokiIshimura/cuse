@@ -27,7 +27,7 @@ export const hashLeaderToken = (token: string): string =>
 export type LeaderCheck = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 const DENIED =
-  'このコマンドは指揮役だけが使えます。指揮役は cuse start で起動してください（配下や手で動かすセッションからは使えません）。';
+  'このコマンドは指揮役だけが使えます（cuse.app が起こした指揮役 cuse-leader から使ってください。配下や手で動かすセッションからは使えません）。';
 
 /**
  * 呼び出し元が指揮役かどうかを確かめる。

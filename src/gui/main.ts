@@ -26,8 +26,8 @@ import {
 } from './ipc.js';
 import { createLeaderStartup, startWhenTrusted } from './leaderStartup.js';
 import { readFolderTrusted } from '../core/claudeTrust.js';
-import { execFileRunner } from '../core/runCommand.js';
 import { ensureSpawnHelperExecutable } from '../core/ptyHelper.js';
+import { installShim } from './cuseShim.js';
 import { createTerminalManager } from './terminals.js';
 
 /**
@@ -92,11 +92,6 @@ const observeAgents = createAgentsObserver({
   },
 });
 
-/**
- * cuse の CLI が PATH にあるか。指揮役は Bash から cuse コマンドを使うので、.app だけを入れた人には
- * 入れ方を知らせる（起動時に 1 回だけ確かめる）。
- */
-let cliInstalled = true;
 
 ipcMain.handle(
   IPC_CHANNELS.getEnvironment,
@@ -104,7 +99,6 @@ ipcMain.handle(
     claudeVersion,
     maxWorkers: MAX_WORKERS,
     platform: process.platform,
-    cliInstalled,
   }),
 );
 
@@ -367,10 +361,22 @@ const preparePath = async (): Promise<void> => {
 
 const prepareVersion = async (): Promise<void> => {
   claudeVersion = await checkClaudeVersion();
-  cliInstalled = await execFileRunner('cuse', ['--version'], { timeoutMs: 5000, signal: undefined }).then(
-    () => true,
-    () => false,
-  );
+};
+
+/**
+ * 指揮役が使う cuse コマンドを ~/.cuse/bin/cuse に置く（指揮役をそろえる前に）。
+ * アプリの中の CLI を、アプリ自身の Electron で動かすので、人は CLI を入れなくてよい。
+ */
+const prepareCuseCommand = async (): Promise<void> => {
+  try {
+    await installShim({
+      home,
+      execPath: process.execPath,
+      cliPath: join(app.getAppPath(), 'dist', 'cli.js'),
+    });
+  } catch (error) {
+    console.error('cuse コマンドを置けませんでした:', error);
+  }
 };
 
 /*
@@ -381,6 +387,7 @@ app
   .whenReady()
   .then(preparePath)
   .then(prepareVersion)
+  .then(prepareCuseCommand)
   .then(createWindow)
   // ウィンドウを先に見せてから指揮役をそろえる（起動を待つ間も一覧は見られる）
   .then(() => {

@@ -32,3 +32,17 @@ export const isInsideStore = (path: string, home: string): boolean => {
   const store = join(home, STORE_DIRECTORY);
   return path === store || path.startsWith(`${store}/`);
 };
+
+/**
+ * cuse.app が置く `cuse` コマンドの置き場所（`~/.cuse/bin`）。
+ *
+ * 人に CLI を入れてもらわなくても、指揮役が Bash から `cuse spawn` などを使えるよう、
+ * アプリが起動のたびにここへ小さなスクリプトを置き、指揮役の PATH の先頭に足す。
+ */
+export const BIN_DIRECTORY = 'bin';
+
+export const buildCuseBin = (home: string): string => join(home, STORE_DIRECTORY, BIN_DIRECTORY);
+
+/** PATH の先頭にディレクトリを足す（既にあれば先頭へ移す）。 */
+export const prependPath = (dir: string, path: string | undefined): string =>
+  [dir, ...(path ?? '').split(':').filter((entry) => entry !== '' && entry !== dir)].join(':');

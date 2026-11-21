@@ -18,16 +18,8 @@ const ANIMATION_INTERVAL_MS = 200;
 
 const NO_AGENTS: readonly Agent[] = [];
 
-/** CLI が無いときの知らせ。指揮役は Bash から cuse コマンドを使うので、無いと配下を起こせない。 */
-export const CLI_MISSING_NOTICE =
-  'cuse コマンドが見つかりません。指揮役が配下を起こすのに使うので、端末で npm install -g https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse.tgz を実行し、cuse.app を開き直してください（入れてあるのに出るときは、ログインシェルの PATH に npm の bin が入っているか確かめてください）。';
-
-/** 上端に出す知らせ（CLI が無い、指揮役をそろえたときの警告など）。 */
-const leaderNotices = (
-  environment: GuiEnvironment,
-  startup: LeaderStartup | undefined,
-): readonly string[] => [
-  ...(environment.cliInstalled ? [] : [CLI_MISSING_NOTICE]),
+/** 上端に出す知らせ（指揮役をそろえたときの警告など）。 */
+const leaderNotices = (startup: LeaderStartup | undefined): readonly string[] => [
   ...(startup?.kind === 'ready' ? startup.warnings : []),
 ];
 
@@ -146,7 +138,7 @@ export const App = ({ environment, bridge }: AppProps) => {
         warnings={model.warnings}
         claudeVersion={environment.claudeVersion}
         fetchError={fetched !== undefined && !fetched.ok ? fetched.error.message : null}
-        notices={leaderNotices(environment, snapshot?.leaderStartup)}
+        notices={leaderNotices(snapshot?.leaderStartup)}
         leaderPending={snapshot === null || snapshot.leaderStartup.kind === 'starting'}
       />
       <main className="columns">
