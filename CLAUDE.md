@@ -8,6 +8,7 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 起動・監視・指示・回収・停止できるようにするデスクトップアプリ（Electron）。配るのは `cuse.app` だけで、CLI は配らない。
 指揮役が Bash から使う `cuse` コマンドは、アプリが開くたびに `~/.cuse/bin/cuse` に置く（`src/gui/cuseShim.ts`）。
 中身はアプリの中の `dist/cli.js` を、アプリ自身の Electron を `ELECTRON_RUN_AS_NODE=1` で動かして実行するだけ。
+macOS では Dock に出ない補助プロセス（`cuse Helper.app`）で動かす（本体で動かすと、cuse コマンドのたびに Dock にアイコンが出たり消えたりする）。
 そのため `.app` は asar にしない（`--no-asar`）。CLI が読む `node_modules/meow` と、端末の `node_modules/node-pty` を `.app` に入れる。
 何をどう作るかは `docs/HANDOFF.md`、設計の理由は `docs/cuse 企画書（単体ツール版）.md` にある。
 

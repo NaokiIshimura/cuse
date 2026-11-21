@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
@@ -41,7 +42,7 @@ import {
 import { createLeaderStartup, startWhenTrusted } from './leaderStartup.js';
 import { readFolderTrusted } from '../core/claudeTrust.js';
 import { ensureSpawnHelperExecutable } from '../core/ptyHelper.js';
-import { installShim } from './cuseShim.js';
+import { installShim, nodeRunnerPath } from './cuseShim.js';
 import { createTerminalManager } from './terminals.js';
 
 /**
@@ -578,7 +579,8 @@ const prepareCuseCommand = async (): Promise<void> => {
   try {
     await installShim({
       home,
-      execPath: process.execPath,
+      // Dock に出ない補助プロセスがあれば、そちらで cuse コマンドを動かす（nodeRunnerPath）
+      execPath: nodeRunnerPath(process.execPath, existsSync),
       cliPath: join(app.getAppPath(), 'dist', 'cli.js'),
     });
   } catch (error) {

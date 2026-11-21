@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prependPath } from '../core/paths.js';
-import { buildShim, installShim, shellQuote, type ShimFileSystem } from './cuseShim.js';
+import { buildShim, installShim, nodeRunnerPath, shellQuote, type ShimFileSystem } from './cuseShim.js';
 
 const dirs: string[] = [];
 afterEach(async () => {
@@ -40,6 +40,26 @@ describe('buildShim', () => {
     await writeFile(shim, buildShim(process.execPath, script), { mode: 0o755 });
     const { stdout } = await promisify(execFile)(shim, ['spawn', 'テストを 足して', 'tests']);
     expect(JSON.parse(stdout)).toEqual(['1', 'spawn', 'テストを 足して', 'tests']);
+  });
+});
+
+describe('nodeRunnerPath', () => {
+  const app = '/Applications/cuse.app/Contents';
+  const helper = `${app}/Frameworks/cuse Helper.app/Contents/MacOS/cuse Helper`;
+
+  it('.app の本体なら、Dock に出ない補助プロセス（cuse Helper）で動かす', () => {
+    expect(nodeRunnerPath(`${app}/MacOS/cuse`, (path) => path === helper)).toBe(helper);
+  });
+
+  it('補助プロセスが無い・.app の外（開発中や macOS 以外）なら、本体のまま', () => {
+    expect(nodeRunnerPath(`${app}/MacOS/cuse`, () => false)).toBe(`${app}/MacOS/cuse`);
+    expect(nodeRunnerPath('/w/cuse/node_modules/electron/dist/electron', () => true)).toBe(
+      '/w/cuse/node_modules/electron/dist/electron',
+    );
+  });
+
+  it('補助プロセスのパスに空白があっても、cuse コマンドは 1 つの引数として埋め込む', () => {
+    expect(buildShim(helper, '/c')).toContain(`exec '${helper}' '/c' "$@"`);
   });
 });
 
