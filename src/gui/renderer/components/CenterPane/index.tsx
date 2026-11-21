@@ -60,21 +60,28 @@ const NoLeader = ({
   if (startup?.kind === 'failed' && startup.untrustedFolder !== null) {
     return (
       <div className="trust">
-        <div className="trust__guide">
-          <p className="placeholder__stage">初回だけ: 指揮役の居場所を Claude Code で信頼してください</p>
-          <p className="placeholder__description">
-            下に {startup.untrustedFolder} で動かした Claude Code が出ます。フォルダを信頼するか聞かれたら、信頼する方を選んでください。
-            選んだら「指揮役を起こす」を押します（下の Claude Code は閉じます）。次からは聞かれません。
-          </p>
+        <section className="trust__guide" role="alert" aria-label="初回だけ: 指揮役の居場所を信頼する">
+          <p className="trust__badge">初回だけ</p>
+          <h2 className="trust__title">指揮役の居場所を Claude Code で信頼してください</h2>
+          <ol className="trust__steps">
+            <li>
+              下の Claude Code が <code>{startup.untrustedFolder}</code> を信頼するか聞いてきます。
+              <strong>信頼する方（Yes）</strong>を選んでください。
+            </li>
+            <li>
+              選んだら <strong>「指揮役を起こす」</strong>を押します（下の Claude Code は閉じます）。
+            </li>
+          </ol>
+          <p className="trust__note">次からは聞かれません。</p>
           <div className="placeholder__actions">
-            <button type="button" className="link-button" onClick={onRetry}>
+            <button type="button" className="primary-button" onClick={onRetry}>
               指揮役を起こす
             </button>
             <button type="button" className="link-button link-button--quiet" onClick={onChooseFolder}>
               別のフォルダで起こす
             </button>
           </div>
-        </div>
+        </section>
         <div className="trust__terminal">
           <TerminalView bridge={bridge} tabId={TRUST_TAB_ID} open={openTrust} active />
         </div>

@@ -212,7 +212,12 @@ describe('App', () => {
     const { container, getByText, unmount } = render(<App environment={environment} bridge={bridge} />);
     await flush();
     await flush();
-    expect(container.textContent).toContain('初回だけ: 指揮役の居場所を Claude Code で信頼してください');
+    expect(container.textContent).toContain('初回だけ');
+    expect(container.textContent).toContain('指揮役の居場所を Claude Code で信頼してください');
+    // 目立つよう、見出しと警告の役割（role="alert"）を持たせる
+    expect(container.querySelector('[role="alert"] h2')?.textContent).toBe(
+      '指揮役の居場所を Claude Code で信頼してください',
+    );
     expect(container.textContent).toContain('/Users/example/.cuse/leader');
     // どのフォルダで動かすかは main が決める（renderer はタブの ID と大きさだけを渡す）
     expect(trusted).toEqual([{ tabId: 'trust' }]);

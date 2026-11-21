@@ -645,14 +645,76 @@ button {
 .trust__guide {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding: 16px 20px;
+  border: 2px solid var(--ink-yellow);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink-yellow) 12%, var(--surface));
+}
+
+/* 人の手が要ることを、承認待ちと同じ黄色で示す */
+.trust__badge {
+  align-self: flex-start;
+  margin: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--ink-yellow);
+  color: #141413;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.trust__title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--fg);
+}
+
+.trust__steps {
+  margin: 0;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.6;
+  color: var(--fg);
+}
+
+.trust__steps code {
+  color: var(--ink-yellow);
+  word-break: break-all;
+}
+
+.trust__steps strong {
+  color: var(--ink-yellow);
+}
+
+.trust__note {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.primary-button {
+  background: var(--ink-yellow);
+  color: #141413;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button:hover {
+  filter: brightness(1.1);
 }
 
 .trust__terminal {
   position: relative;
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--border);
+  border: 2px solid color-mix(in srgb, var(--ink-yellow) 60%, var(--border));
   border-radius: 8px;
 }
 
