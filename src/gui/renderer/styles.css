@@ -630,3 +630,33 @@ button {
   display: flex;
   gap: 8px;
 }
+
+/* 初回だけ: 指揮役の居場所を信頼してもらう */
+
+.trust {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.trust__guide {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trust__terminal {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* 指揮役のタブが無い間は、端末の場所を取らない（案内と信頼の端末に高さを譲る） */
+.center-pane__terminals:empty {
+  display: none;
+}

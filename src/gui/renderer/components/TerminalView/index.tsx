@@ -7,8 +7,11 @@ import type { CuseBridge } from '../../../ipc.js';
 interface TerminalViewProps {
   readonly bridge: CuseBridge;
   readonly tabId: string;
-  /** 開く相手。実行するコマンドは main が決める */
-  readonly sessionId: string;
+  /** main に端末を開いてもらう。実行するコマンドは main が決める */
+  readonly open: (
+    cols: number,
+    rows: number,
+  ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
   /** 表に出ているタブか。隠れている間も会話の続きを受け取るため、閉じずに残す */
   readonly active: boolean;
 }
@@ -24,7 +27,7 @@ type Connection =
  * cuse 独自の入力欄は作らない。人はこの中で Claude Code に直接打ち込み、配下の承認もここで行う
  * （cuse が承認するのではなく、人が Claude Code の画面で承認する）。
  */
-export const TerminalView = ({ bridge, tabId, sessionId, active }: TerminalViewProps) => {
+export const TerminalView = ({ bridge, tabId, open, active }: TerminalViewProps) => {
   const container = useRef<HTMLDivElement | null>(null);
   const terminal = useRef<Terminal | null>(null);
   const fit = useRef<FitAddon | null>(null);
@@ -36,9 +39,9 @@ export const TerminalView = ({ bridge, tabId, sessionId, active }: TerminalViewP
       return;
     }
     setConnection({ kind: 'connecting' });
-    const result = await bridge.openTerminal({ tabId, sessionId, cols: term.cols, rows: term.rows });
+    const result = await open(term.cols, term.rows);
     setConnection(result.ok ? { kind: 'open' } : { kind: 'closed', message: result.message });
-  }, [bridge, tabId, sessionId]);
+  }, [open]);
 
   useEffect(() => {
     const element = container.current;

@@ -35,7 +35,7 @@ const EmptyMessage = ({
       <p>
         {ledgerAvailable
           ? '動いている配下はいません。'
-          : '台帳（~/.cuse/ledger.json）がまだ無いので、配下はいません。cuse start で指揮役を起動し、指揮役に依頼してください。'}
+          : '台帳（~/.cuse/ledger.json）がまだ無いので、配下はいません。中央の指揮役に依頼すると、指揮役が配下を起こします。'}
       </p>
       <button type="button" className="link-button" onClick={onShowAll}>
         マシン上の全セッションを表示

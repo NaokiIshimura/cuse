@@ -33,6 +33,8 @@ export const IPC_CHANNELS = {
   ensureLeader: 'leader:ensure',
   /** 指揮役を起こすフォルダを人に選んでもらい、そこで起こす */
   chooseLeaderFolder: 'leader:chooseFolder',
+  /** 指揮役の居場所を信頼してもらうため、そのフォルダで claude を動かす（初回だけ） */
+  openTrustTerminal: 'terminal:openTrust',
 } as const;
 
 /** 起動時に 1 回だけ取る環境。 */
@@ -58,6 +60,12 @@ export interface OpenTerminalRequest {
   readonly tabId: string;
   /** 開く相手。実行するコマンドは main が決める */
   readonly sessionId: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+export interface OpenTrustTerminalRequest {
+  readonly tabId: string;
   readonly cols: number;
   readonly rows: number;
 }
@@ -88,4 +96,11 @@ export interface CuseBridge {
   readonly ensureLeader: () => Promise<LeaderStartup>;
   /** フォルダを選ぶダイアログを出し、選ばれたらそこで指揮役を起こす。取り消したらいまの状態を返す */
   readonly chooseLeaderFolder: () => Promise<LeaderStartup>;
+  /**
+   * 指揮役を起こせなかった理由が「フォルダを信頼していない」とき、そのフォルダで claude を動かす。
+   * どのフォルダかは main が決める（renderer からフォルダは渡さない）
+   */
+  readonly openTrustTerminal: (
+    request: OpenTrustTerminalRequest,
+  ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
 }

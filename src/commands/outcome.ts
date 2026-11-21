@@ -30,6 +30,8 @@ export interface CommandError {
   readonly kind: CommandErrorKind;
   readonly message: string;
   readonly candidates?: readonly string[];
+  /** `untrusted` のとき、信頼されていなかったフォルダ */
+  readonly folder?: string;
 }
 
 export type Outcome<T> =

@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import { IPC_CHANNELS, type CuseBridge, type OpenTerminalRequest } from './ipc.js';
+import {
+  IPC_CHANNELS,
+  type CuseBridge,
+  type OpenTerminalRequest,
+  type OpenTrustTerminalRequest,
+} from './ipc.js';
 
 /**
  * renderer へ公開する API。
@@ -41,6 +46,8 @@ const bridge: CuseBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.stopWorker, sessionId, reason),
   ensureLeader: () => ipcRenderer.invoke(IPC_CHANNELS.ensureLeader),
   chooseLeaderFolder: () => ipcRenderer.invoke(IPC_CHANNELS.chooseLeaderFolder),
+  openTrustTerminal: (request: OpenTrustTerminalRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.openTrustTerminal, request),
 };
 
 contextBridge.exposeInMainWorld('cuse', bridge);

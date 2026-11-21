@@ -19,10 +19,11 @@ import {
   type GuiEnvironment,
   type OpenTerminalRequest,
   type OpenTerminalResult,
+  type OpenTrustTerminalRequest,
   type Snapshot,
   type StopWorkerResult,
 } from './ipc.js';
-import { createLeaderStartup, startupCwd } from './leaderStartup.js';
+import { createLeaderStartup } from './leaderStartup.js';
 import { createTerminalManager } from './terminals.js';
 
 /**
@@ -96,28 +97,20 @@ ipcMain.handle(
  * アプリを開いたら指揮役をそろえる（`cuse start` と同じ処理）。
  * 指揮役がいなければ起こし、止まっていれば再開し、動いていれば何もしない。
  */
-const leaderStartup = createLeaderStartup({
-  start: (cwd) => runStart({ cwd }, defaultDeps()),
-  hasLeader: async () => {
-    const ledger = await readLedger({ home });
-    return ledger.kind === 'ok' && ledger.ledger.leader !== null;
-  },
-  initialCwd: startupCwd(process.cwd(), home),
-});
+const leaderStartup = createLeaderStartup((cwd) => runStart({ cwd }, defaultDeps()));
 
 ipcMain.handle(IPC_CHANNELS.ensureLeader, () => leaderStartup.ensure());
 
 /**
  * 指揮役を起こすフォルダを選んでもらう。
  *
- * Finder から開いたときは置き場所が分からず、ホームフォルダは Claude Code が指揮役に使わせないので、
- * 作業するリポジトリなどを人に選んでもらう。
+ * 置き場所は既定で指揮役の居場所 `~/.cuse/leader`。別の場所（作業するリポジトリなど）で起こしたい人のための口。
  */
 ipcMain.handle(IPC_CHANNELS.chooseLeaderFolder, async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const options = {
     title: '指揮役を起こすフォルダ',
-    message: '指揮役を起こすフォルダを選んでください（作業するリポジトリなど。ホームフォルダは使えません）',
+    message: '指揮役を起こすフォルダを選んでください（ホームフォルダは使えません）',
     buttonLabel: 'ここで起こす',
     defaultPath: home,
     properties: ['openDirectory' as const],
@@ -186,8 +179,27 @@ ipcMain.handle(
       return target;
     }
     terminalTarget = event.sender;
-    terminals.open(request.tabId, target.shortId, request.cols, request.rows);
+    terminals.open(request.tabId, { kind: 'attach', shortId: target.shortId }, request.cols, request.rows);
     return { ok: true, name: target.name, shortId: target.shortId, role: target.role };
+  },
+);
+
+/**
+ * 指揮役の居場所を信頼してもらう端末（初回だけ）。
+ *
+ * そのフォルダで引数なしの claude を動かし、Claude Code 自身の信頼の確認に人が答える
+ * （cuse が信頼を書き込むことはしない）。動かせるのは、直前に「信頼していない」と断られたフォルダだけ。
+ */
+ipcMain.handle(
+  IPC_CHANNELS.openTrustTerminal,
+  (event, request: OpenTrustTerminalRequest) => {
+    const status = leaderStartup.status();
+    if (status.kind !== 'failed' || status.untrustedFolder === null || typeof request?.tabId !== 'string') {
+      return { ok: false as const, message: '信頼してもらうフォルダがありません。' };
+    }
+    terminalTarget = event.sender;
+    terminals.open(request.tabId, { kind: 'trust', folder: status.untrustedFolder }, request.cols, request.rows);
+    return { ok: true as const };
   },
 );
 
