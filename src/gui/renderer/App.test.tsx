@@ -34,7 +34,6 @@ const environment: GuiEnvironment = {
   claudeVersion: { ok: true, version: '2.1.325' },
   maxWorkers: 3,
   platform: 'darwin',
-  cliInstalled: true,
 };
 
 const missingSnapshot: Snapshot = {
@@ -223,7 +222,11 @@ describe('App', () => {
     expect(container.textContent).toContain('/Users/example/.cuse/leader');
     // どのフォルダで動かすかは main が決める（renderer はタブの ID と大きさだけを渡す）
     expect(trusted).toEqual([{ tabId: 'trust' }]);
-    expect(container.textContent).toContain('信頼すると、自動で指揮役が起きます');
+    expect(container.textContent).toContain('信頼すると、下の Claude Code は自動で閉じて、指揮役が起きます');
+    // はじめは「No, exit」が選ばれているので、選ぶキーまで書く
+    expect(container.textContent).toContain('↓ キーで「Yes, I trust this folder」を選び、Enter');
+    // 信頼の端末は指揮役ではないと書く
+    expect(container.querySelector('.trust__terminal-label')?.textContent).toContain('指揮役ではありません');
 
     fireEvent.click(getByText('▶ 指揮役を起こす'));
     expect(ensured()).toBe(1);
@@ -243,15 +246,6 @@ describe('App', () => {
     const { container } = render(<App environment={environment} bridge={bridge} />);
     await flush();
     expect(container.querySelector('.top-bar__notices')?.textContent).toContain('スキルが別の内容です');
-  });
-
-  it('cuse コマンドが無ければ、入れ方を上端に出す', async () => {
-    const { bridge } = makeBridge(leaderSnapshot);
-    const { container } = render(
-      <App environment={{ ...environment, cliInstalled: false }} bridge={bridge} />,
-    );
-    await flush();
-    expect(container.querySelector('.top-bar__notices')?.textContent).toContain('npm install -g');
   });
 
   it('まだ配下を起こしていなければ、指揮役に何を書けばよいかを見せる', async () => {

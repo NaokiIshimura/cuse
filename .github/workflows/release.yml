@@ -2,8 +2,9 @@ name: release
 
 # PR が main にマージされた（= main への push）タイミングで配布物を作り、
 # package.json の version に対応するリリースがまだ無ければ Releases に公開する。
-# 配布物は 2 種類: CLI の npm パッケージ（.tgz）と、macOS 用の .app（zip）。
-# （cc-park の release.yml を元に、CLI の .tgz を足したもの）
+# 配布物は macOS 用の .app（zip）だけ。cuse は .app だけで使え、CLI は配らない
+# （指揮役が使う cuse コマンドは、.app が ~/.cuse/bin/cuse に置く）。
+# （cc-park の release.yml を元にしたもの）
 on:
   push:
     branches:
@@ -58,20 +59,11 @@ jobs:
           npm run typecheck
           npm test
 
-      - name: CLI の npm パッケージを作る
-        env:
-          VERSION: ${{ steps.version.outputs.value }}
-        run: |
-          mkdir -p artifacts
-          npm run build
-          npm pack --pack-destination artifacts
-          # README の手順は releases/latest/download/ から取るので、名前にバージョンを含まない複製も添える
-          cp "artifacts/cuse-${VERSION}.tgz" artifacts/cuse.tgz
-
       - name: .app をビルドして zip にまとめる
         env:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
+          mkdir -p artifacts
           for arch in arm64 x64; do
             # ad-hoc での署名し直しと検証は postgui:package が行う
             npm run gui:package -- --arch="${arch}"
@@ -86,9 +78,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cuse-${{ steps.version.outputs.value }}
-          path: |
-            artifacts/*.tgz
-            artifacts/*.zip
+          path: artifacts/*.zip
           retention-days: 14
 
       - name: リリースノートを書く
@@ -99,22 +89,12 @@ jobs:
           cat > release-notes.md <<'NOTES'
           ## ダウンロード
 
-          | ファイル | 中身 |
+          | ファイル | 対象 |
           | --- | --- |
-          | `cuse-VERSION.tgz` / `cuse.tgz` | CLI（`cuse status` / `agents` / `output` / `app`）の npm パッケージ |
-          | `cuse-VERSION-darwin-arm64.zip` / `cuse-darwin-arm64.zip` | ウィンドウの `.app`（Apple シリコン、M1 以降） |
-          | `cuse-VERSION-darwin-x64.zip` / `cuse-darwin-x64.zip` | ウィンドウの `.app`（Intel Mac） |
+          | `cuse-VERSION-darwin-arm64.zip` / `cuse-darwin-arm64.zip` | Apple シリコン（M1 以降） |
+          | `cuse-VERSION-darwin-x64.zip` / `cuse-darwin-x64.zip` | Intel Mac |
 
-          Node.js 20 以上と、Claude Code v2.1.139 以降（`claude` コマンドが PATH にあること）が必要です。
-
-          ## CLI をインストールする
-
-          ```bash
-          npm install -g https://github.com/NaokiIshimura/cuse/releases/download/vVERSION/cuse-VERSION.tgz
-          ```
-
-          `cuse app` でウィンドウも開けます（Electron は npm の依存として一緒に入ります）。
-          アンインストールは `npm uninstall -g cuse` です。
+          Claude Code v2.1.224 以降（`claude` コマンドが使えること）が必要です。Node.js や npm は要りません。
 
           ## .app をインストールする（macOS）
 
@@ -150,16 +130,9 @@ jobs:
 
           ## 使い方
 
-          作業するリポジトリで次を実行すると、指揮役 `cuse-leader` が起動し、cuse のウィンドウが開きます。
-          ウィンドウの中央で指揮役に依頼してください。配下の承認は、左でその配下を「開く」と中央に出る Claude Code の画面で行います。
-
-          ```bash
-          cuse start
-          ```
-
-          `.app` を開いても、同じように指揮役がそろいます。Finder から開いたときは、指揮役の居場所 `~/.cuse/leader` で起こします。
-          初回だけ、ウィンドウの中央に出る Claude Code の確認で、そのフォルダを信頼してください。次からは聞かれません。
-          指揮役が `cuse` コマンドを使うので、CLI も入れておいてください。
+          `cuse.app` を開くと、指揮役 `cuse-leader` が `~/.cuse/leader` で起きます。
+          初回だけ、ウィンドウの中央に出る Claude Code の確認で、そのフォルダを信頼してください（↓ キーで「Yes, I trust this folder」を選んで Enter）。
+          指揮役が起きたら、中央で依頼してください。配下の承認は、左のカードの「開いて承認する」で中央に出る Claude Code の画面で行います。
           NOTES
           sed -i '' "s/VERSION/${VERSION}/g" release-notes.md
 
@@ -169,7 +142,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release create "${TAG}" artifacts/*.tgz artifacts/*.zip \
+          gh release create "${TAG}" artifacts/*.zip \
             --title "cuse ${TAG}" \
             --notes-file release-notes.md \
             --generate-notes \

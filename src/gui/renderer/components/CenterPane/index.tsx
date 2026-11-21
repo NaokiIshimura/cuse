@@ -67,11 +67,11 @@ const NoLeader = ({
           <h2 className="trust__title">指揮役の居場所を Claude Code で信頼してください</h2>
           <ol className="trust__steps">
             <li>
-              下の Claude Code が <code>{startup.untrustedFolder}</code> を信頼するか聞いてきます。
-              <strong>信頼する方（Yes）</strong>を選んでください。
+              下の Claude Code が <code>{startup.untrustedFolder}</code> を信頼するか聞いています。
+              <strong>↓ キーで「Yes, I trust this folder」を選び、Enter</strong> を押してください（はじめは「No, exit」が選ばれています）。
             </li>
             <li>
-              信頼すると、自動で指揮役が起きます（下の Claude Code は閉じます）。下の Claude Code には何も打ち込まなくて大丈夫です。
+              信頼すると、下の Claude Code は自動で閉じて、指揮役が起きます。下の Claude Code には何も打ち込まなくて大丈夫です。
             </li>
             <li>
               起きないときは、<strong>「▶ 指揮役を起こす」</strong>を押してください。
@@ -87,6 +87,9 @@ const NoLeader = ({
             </button>
           </div>
         </section>
+        <p className="trust__terminal-label">
+          ↓ 信頼の確認のためだけに動かしている Claude Code です（指揮役ではありません。信頼すると閉じます）
+        </p>
         <div className="trust__terminal">
           <TerminalView bridge={bridge} tabId={TRUST_TAB_ID} open={openTrust} active />
         </div>

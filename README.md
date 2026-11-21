@@ -1,47 +1,33 @@
 # cuse
 
 1 つの Claude Code セッション（**指揮役**）が、同じマシンのほかの Claude Code セッション（**配下**）を
-起動・監視・指示・回収・停止できるようにする CLI と、人が見るデスクトップアプリです。
+起動・見守り・指示・停止できるようにするデスクトップアプリ（macOS）です。
 [tribe CLI の muse](https://hub.openclaw.ai/alexander-morris/skills/muse) を参考にしています。
 
-- 指揮役はマシンに 1 人。作業はせず、計画・分担・確認・報告だけをします。
-- 作業はすべて配下（`claude --bg --name` で起動する background セッション）が、それぞれ別の worktree で行います。
-- 人は指揮役とだけ話します。人に回るのは権限の承認と方針の判断だけです。
+- 人は cuse のウィンドウの中央で、指揮役とだけ話します。人に回ってくるのは権限の承認と方針の判断だけです。
+- 指揮役は作業をしません。計画・分担・確認・報告だけをし、作業はすべて配下（background セッション）に任せます。
+- 配下の様子はウィンドウの左に並び、承認が要るとカードに「開いて承認する」が出ます。
 
-> **いまは第 2 段階（v0.2.0）です。** 指揮役の起動（`start`）と、配下の起動・待機・指示・停止
-> （`spawn` / `wait` / `prompt` / `kill`）、ウィンドウ中央の埋め込み端末が入りました。
-> 差分の回収と片付け（`review` / `clean`）、右のプレビューは第 3 段階で入ります。
+> **いまは第 2 段階（v0.2）です。** 指揮役の起動、配下の起動・待機・指示・停止、ウィンドウ中央の埋め込み端末まで。
+> 差分の回収と片付け、右のプレビューは第 3 段階で入ります。
 
 ## 必要なもの
 
-- Node.js 20 以上
-- Claude Code v2.1.139 以降（background セッションに対応した版）。古いときは cuse が知らせます。
-  指揮役（`cuse start`）は配下へ `SendMessage` で指示するため、v2.1.224 以降が要ります。
-- macOS（Linux はデスクトップ環境があれば動きます）
+- macOS
+- Claude Code v2.1.224 以降（`claude` コマンドが使えること）。古いときは cuse が知らせます。
+
+Node.js や npm は要りません。cuse は `cuse.app` だけで使えます。
 
 ## インストール
 
-[Releases](../../releases) から CLI の npm パッケージと、macOS 用の `.app` をダウンロードできます。
-`main` へマージされると、`package.json` の `version` で自動的にリリースされます。
+[Releases](../../releases) から `.app` をダウンロードできます。
 
-| ファイル | 中身 |
+| ファイル | 対象 |
 | --- | --- |
-| `cuse-<version>.tgz` / `cuse.tgz` | CLI（`cuse status` / `agents` / `output` / `app`）の npm パッケージ |
-| `cuse-<version>-darwin-arm64.zip` / `cuse-darwin-arm64.zip` | ウィンドウの `.app`（Apple シリコン、M1 以降） |
-| `cuse-<version>-darwin-x64.zip` / `cuse-darwin-x64.zip` | ウィンドウの `.app`（Intel Mac） |
+| `cuse-<version>-darwin-arm64.zip` / `cuse-darwin-arm64.zip` | Apple シリコン（M1 以降） |
+| `cuse-<version>-darwin-x64.zip` / `cuse-darwin-x64.zip` | Intel Mac |
 
 バージョンを含まない方は中身が同じ複製で、下記の手順はこちらを使って常に最新版を取得します。
-
-### CLI
-
-```bash
-npm install -g https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse.tgz
-```
-
-`cuse app` でウィンドウも開けます（Electron は npm の依存として一緒に入ります）。
-アンインストールは `npm uninstall -g cuse` です。
-
-### .app（macOS）
 
 配布用の証明書で署名・公証をしていないため、ブラウザでダウンロードすると初回は Gatekeeper に止められます。
 ターミナルで次のコマンドを実行すると、最新版をダウンロードして `/Applications` に置けます（古い `cuse.app` は置き換えます）。
@@ -72,66 +58,67 @@ curl -fL -o /tmp/cuse.zip https://github.com/NaokiIshimura/cuse/releases/latest/
 xattr -dr com.apple.quarantine /Applications/cuse.app
 ```
 
-### ソースから
-
-```bash
-npm install
-npm run build
-npm link
-```
-
 ## はじめて使うとき
 
-1. CLI と `.app` を入れます（上の「インストール」）。指揮役が `cuse` コマンドを使うので、`.app` だけでなく CLI も入れてください。入っていなければウィンドウの上端に入れ方が出ます。
-2. `cuse.app` を開きます。指揮役は `~/.cuse/leader` で起きます。
-3. **初回だけ**、中央の黄色い枠に「指揮役の居場所を Claude Code で信頼してください」と出ます。下に出る Claude Code の確認で信頼する方（Yes）を選ぶと、自動で指揮役が起きます。起きないときは「▶ 指揮役を起こす」を押します。
-4. 中央に指揮役が出たら、「ここから依頼します」の例のように、やってほしいことを書いて Enter を押します（どのリポジトリでの作業かも書きます）。
-5. 指揮役が配下を起こすと、左に並びます。承認が要ると、カードに黄色い「開いて承認する」が出るので、押して中央の Claude Code で承認します。
-
-## 使い方
-
-1. cuse のウィンドウを開きます（`cuse.app` を開くか、作業するリポジトリで `cuse start` / `cuse app` を実行）。
-   ウィンドウを開くと指揮役 `cuse-leader` がそろいます。いなければ起こし、止まっていれば再開し、動いていればそのまま使います。
-2. ウィンドウの中央（指揮役の会話）で、指揮役に依頼します。例: 「通知設定の整理、README の更新、テストの追加を並行で。終わったら差分をまとめて見せて」
-3. 指揮役が `cuse spawn` で配下を起動し、`cuse wait` で待ちます。配下の様子は左に出ます。
-4. 配下が権限の承認待ちになると、指揮役が知らせます。左でその配下を「開く」と、中央に配下の Claude Code の画面が出るので、そこで承認します。
+1. `cuse.app` を開きます。指揮役は指揮役の居場所 `~/.cuse/leader` で起きます。
+2. **初回だけ**、中央の黄色い枠に「指揮役の居場所を Claude Code で信頼してください」と出ます。その下は信頼の確認のためだけに動かしている Claude Code です（指揮役ではありません）。↓ キーで「Yes, I trust this folder」を選んで Enter を押すと、自動で閉じて指揮役が起きます。起きないときは「▶ 指揮役を起こす」を押します。
+3. 中央に指揮役が出たら、「ここから依頼します」の例のように、やってほしいことを書いて Enter を押します。どのリポジトリでの作業かも書いてください（例: 「~/work/app の README の誤字を直して、テストも足して。終わったら差分を見せて」）。
+4. 指揮役が配下を起こすと、左に並びます。承認が要ると、カードに黄色い「開いて承認する」が出るので、押して中央に出る配下の Claude Code で承認します。
 5. 終わったら、指揮役が報告と差分をまとめて伝えます。取り込み（PR のマージ）は人が行います。
 
-```bash
-cuse start
-```
+ウィンドウを閉じても、指揮役と配下は止まりません。もう一度開くと、同じ指揮役が開きます。
 
-## コマンド
+## ウィンドウ
 
-| コマンド | 使う人 | 動き |
+見た目の完成形は `docs/cuse attach.png` です。
+
+| 場所 | 中身 | 入った段階 |
 | --- | --- | --- |
-| `cuse start [--cwd <dir>] [--new] [--permission-mode <m>] [--no-app]` | 人 | 指揮役 `cuse-leader` を起動し、ウィンドウを開く。指揮役が動いていれば起こさずに開くだけ、止まっていれば `claude --resume` で同じ会話を再開する。作り直すときだけ `--new`（前の指揮役は止め、配下は引き継ぐ） |
-| `cuse app` | 人 | ウィンドウを開き、指揮役をそろえる（`cuse start` と同じ処理。1 つだけ。2 つ目は前のウィンドウを前に出す） |
-| `cuse install-skill [--force]` | 人 | cuse スキルを `~/.claude/skills/cuse/SKILL.md` に置く（`start` は無ければ置く） |
-| `cuse status [--all] [--json]` | 指揮役・人 | 配下の数、状態ごとの件数、人の対応が要るもの（承認待ち・入力待ち）、健全性の警告 |
-| `cuse agents [--all] [--json]` | 指揮役・人 | 配下の状態、待っているもの、承認待ちのツール、最後の指示、コンテキスト使用率 |
-| `cuse output <名前> [--lines N] [--json]` | 指揮役・人 | 最後の報告（transcript の最後の assistant 発言）と `claude logs` の末尾 |
-| `cuse wait <名前…> [--until attention\|idle\|done] [--timeout <秒>] [--json]` | 指揮役・人 | 条件が成り立つまで待ち、誰が何のために止まったかを返す |
-| `cuse spawn "<タスク>" <名前> [--cwd <dir>] [--agent <name>] [--model <model>] [--json]` | 指揮役 | 配下を `claude --bg --name` で起動し、台帳に記録する |
-| `cuse prompt <名前> "<指示>" [--json]` | 指揮役 | 止まった配下に `claude --resume` で続きを頼む。動いていれば送らずに「SendMessage で送る」よう返す |
-| `cuse kill <名前> --reason "<理由>" [--json]` | 指揮役 | `claude stop` で止め、理由を台帳に残す |
+| 上端のバー | `cuse` の印、指揮役の名前と状態、配下数（上限つき）、対応待ち数、指揮役のコンテキスト使用率。健全性の警告（止まっている配下、5 分以上の承認待ち、上限に達した同時実行数）と、Claude Code が古いときの案内 | 1 |
+| 左 | 配下のカード一覧。承認待ちが先頭。Clawd の AA・名前・状態・経過時間・最後の動き。終わった配下は「DONE」の下に薄く。「配下 / 全セッション」で切り替え。カードの「開く」（承認待ちなら「開いて承認する」）で中央に開き、「止める」で止める（台帳の配下だけ。理由を書く） | 1・2 |
+| 中央 | 埋め込み端末（xterm.js + node-pty）で `claude attach` をそのまま動かす。先頭のタブは指揮役で、上に大きめの Clawd と「指揮役」の印。左で開いた配下はタブで並ぶ | 2 |
+| 右 | プレビュー | 3 |
+
+- 人はウィンドウの中央で指揮役と話します。cuse 独自の入力欄はなく、Claude Code の画面をそのまま使います。
+- 承認のボタンはありません。「開いて承認する」は配下の Claude Code を中央に開くだけで、承認は人がその画面で行います。
+- タブを閉じる・ウィンドウを閉じると `claude attach` を切るだけで、指揮役と配下は止まりません。
+- ウィンドウは 1 つだけです。2 つ目を開こうとすると、前のウィンドウが前に出ます。
+- Clawd の AA は cc-park と同じ定義です。承認待ち = 右手が上下（黄）、作業中 = 足が動く（シアン）、
+  完了直後 = 両手（明るい緑）、入力待ち・停止 = 静止（灰）。指揮役は cuse の色で描きます。サブエージェントが動いていればミニキャラクターが並びます。
+- OS の「視差効果を減らす」がオンなら、AA とボタンの光は動きません。
+
+### 指揮役の起こし方
+
+- ウィンドウを開くと指揮役をそろえます。いなければ起こし、止まっていれば `claude --resume` で同じ会話を再開し、動いていればそのまま使います。**指揮役はマシンに 1 人**です。
+- 指揮役の居場所は `~/.cuse/leader` です（無ければ作ります）。ホームフォルダは Claude Code がそこでの background セッションを断るので使いません。別の場所で起こしたいときは、中央の「別のフォルダで起こす」を使います。
+- 初回だけ、Claude Code がまだ `~/.cuse/leader` を信頼していないので、そのフォルダで動かした Claude Code の確認に人が答えます。cuse が Claude Code の設定に信頼を書き込むことはしません。信頼したかは `~/.claude.json` を読んで確かめ、信頼したら自動で指揮役を起こします（読むだけです）。
+- 指揮役は Edit / Write / NotebookEdit を外して起動し、作業は必ず配下に任せます。心得（`prompts/leader.md`）を追加のシステムプロンプトで渡し、cuse スキル（`~/.claude/skills/cuse/SKILL.md`）を置きます。
+
+## 指揮役が使うコマンド
+
+指揮役は Bash から `cuse` コマンドで配下を動かします。このコマンドは人が入れるものではなく、
+`cuse.app` が開くたびに `~/.cuse/bin/cuse` に置き、指揮役の PATH の先頭に足します。中身はアプリの中の CLI を、
+アプリ自身の Electron を Node として動かして実行するだけなので、Node.js や npm は要りません。
+
+| コマンド | 動き |
+| --- | --- |
+| `cuse status [--all] [--json]` | 配下の数、状態ごとの件数、人の対応が要るもの（承認待ち・入力待ち）、健全性の警告 |
+| `cuse agents [--all] [--json]` | 配下の状態、待っているもの、承認待ちのツール、最後の指示、コンテキスト使用率 |
+| `cuse output <名前> [--lines N] [--json]` | 最後の報告（transcript の最後の assistant 発言）と `claude logs` の末尾 |
+| `cuse wait <名前…> [--until attention\|idle\|done] [--timeout <秒>] [--json]` | 条件が成り立つまで待ち、誰が何のために止まったかを返す |
+| `cuse spawn "<タスク>" <名前> --cwd <dir> [--agent <name>] [--model <model>] [--json]` | 配下を `claude --bg --name` で起動し、台帳に記録する（指揮役だけ） |
+| `cuse prompt <名前> "<指示>" [--json]` | 止まった配下に `claude --resume` で続きを頼む。動いていれば送らずに「SendMessage で送る」よう返す（指揮役だけ） |
+| `cuse kill <名前> --reason "<理由>" [--json]` | `claude stop` で止め、理由を台帳に残す（指揮役だけ） |
 
 - `status` / `agents` の既定の対象は台帳 `~/.cuse/ledger.json` に載った配下だけです。マシン上の全セッションは `--all` で見られます。
 - 名前は、完全一致 → 短縮 ID / sessionId → 前方一致 → 部分一致 の順に探します。1 つに決まらないときは候補を並べてエラーにします。
 - `spawn` / `prompt` / `kill` で指せるのは台帳に載った配下だけです。人が手で動かしているセッションは見るだけです。
-- `--debug` を付けると、受け取った `claude agents --json` の出力と解釈できない値を `~/.cuse/debug/` に残します。
-
-### 指揮役と配下
-
-- **指揮役はマシンに 1 人**です。`cuse start` は 2 人目を起こしません。
-- 指揮役は Edit / Write / NotebookEdit を外して起動し、作業は必ず配下に任せます。心得（`prompts/leader.md`）を追加のシステムプロンプトで渡します。
-- 配下は指揮役と同じ権限モードで起動します（違うと `SendMessage` が保留されるため）。権限確認を飛ばすモード（`bypassPermissions` など）は使えません。
-- 配下には心得（`prompts/worker.md`）を渡し、main / master へのマージや push をしないこと、最後に要約を報告することを伝えます。
-- git リポジトリでない場所に `spawn` すると、worktree が作られず配下同士が同じファイルを書き合うので警告します。
+- 指揮役の居場所はリポジトリではないので、`spawn` には `--cwd <作業するリポジトリ>` を付けます。`~/.cuse` の中では配下を起こしません。
+- 配下は指揮役と同じ権限モードで起動します（違うと `SendMessage` が保留されるため）。権限確認を飛ばすモードは使いません。配下には心得（`prompts/worker.md`）を渡し、main / master へのマージや push をしないこと、最後に要約を報告することを伝えます。
 
 ### 指揮役のトークン
 
-`spawn` / `prompt` / `kill` は指揮役だけが使えます。`cuse start` は起動のたびにトークンを作り、指揮役の環境変数 `CUSE_LEADER_TOKEN` にだけ渡します（`--settings` の `env` と、起動するプロセスの環境の両方）。台帳にはハッシュだけを残します。配下を起動するときはこの環境変数を外すので、配下は別の配下を作れません。
+`spawn` / `prompt` / `kill` は指揮役だけが使えます。指揮役を起こすたびにトークンを作り、指揮役の環境変数 `CUSE_LEADER_TOKEN` にだけ渡します（`--settings` の `env` と、起動するプロセスの環境の両方）。台帳にはハッシュだけを残します。配下を起動するときはこの環境変数を外すので、配下は別の配下を作れません。
 
 background セッションを起こす常駐プロセスが環境変数を引き継がなかった場合に備えて、呼び出し元の `CLAUDE_JOB_DIR`（background セッションの中で Claude Code が立てる）が台帳の指揮役の短縮 ID と一致するときも指揮役とみなします。
 
@@ -212,35 +199,9 @@ background セッションを起こす常駐プロセスが環境変数を引き
 
 `cuse kill --json` は `name` / `shortId` / `reason` / `endedAt` を返します。
 
-`cuse start --json` は `action`（`opened` / `started` / `resumed` / `recreated`）/ `leader` / `skill` を返します。
-
 失敗は終了コード 1 と、標準出力の `{"error":{"kind","message"}}` で返します。
 `kind` は `usage` / `not-found` / `ambiguous`（`candidates` 付き）/ `denied`（指揮役ではない）/ `limit`（上限）/
 `conflict`（同じ名前の配下がいる）/ `launch`（`claude --bg` / `stop` の失敗）/ `ledger`（台帳を読めない）/ `version` / `timeout` / `exit` / `parse` です。
-
-## ウィンドウ（`cuse app`）
-
-見た目の完成形は `docs/cuse attach.png` です。
-
-| 場所 | 中身 | 入った段階 |
-| --- | --- | --- |
-| 上端のバー | `cuse` の印、指揮役の名前と状態、配下数（上限つき）、対応待ち数、指揮役のコンテキスト使用率。健全性の警告（止まっている配下、5 分以上の承認待ち、上限に達した同時実行数）と、Claude Code が古いときの案内 | 1 |
-| 左 | 配下のカード一覧。承認待ちが先頭。Clawd の AA・名前・状態・経過時間・最後の動き。終わった配下は「DONE」の下に薄く。「配下 / 全セッション」で切り替え。カードの「開く」で中央に開き、「止める」で止める（台帳の配下だけ。理由を書く） | 1・2 |
-| 中央 | 埋め込み端末（xterm.js + node-pty）で `claude attach` をそのまま動かす。先頭のタブは指揮役で、上に大きめの Clawd と「指揮役」の印。左で開いた配下はタブで並ぶ | 2 |
-| 右 | プレビュー | 3 |
-
-- ウィンドウを開くと指揮役をそろえます（`cuse start` と同じ処理）。台帳に指揮役がいれば、その場所で再開・表示します。
-- 新しく起こすときの置き場所は、端末から `cuse app` / `cuse start` を作業ディレクトリで実行したときはそのディレクトリです。`cuse.app` を Finder や Dock から開いたとき、またはホームフォルダで実行したときは、**指揮役の居場所 `~/.cuse/leader`** です（無ければ作ります）。ホームフォルダは Claude Code がそこでの background セッションを断るので使いません。
-- **初回だけ**、Claude Code は `~/.cuse/leader` をまだ信頼していないので、ウィンドウの中央にそのフォルダで動かした Claude Code が出ます。フォルダを信頼するか聞かれたら信頼する方を選び、「指揮役を起こす」を押します。次からは聞かれません（cuse が信頼を書き込むことはせず、Claude Code 自身の確認に人が答えます）。端末では `cd ~/.cuse/leader && claude` を一度実行して信頼しても同じです。
-- 指揮役の居場所はリポジトリではないので、指揮役は配下を `cuse spawn ... --cwd <作業するリポジトリ>` で起こします。`~/.cuse` の中では配下を起こしません。
-- 別の場所で起こしたいときは、中央の「別のフォルダで起こす」か、`cuse start --cwd <dir>` を使います。
-- 人はウィンドウの中央で指揮役と話します。cuse 独自の入力欄はなく、Claude Code の画面をそのまま使います。
-- 承認のボタンはありません。左で配下を「開く」と中央に配下の Claude Code の画面が出るので、そこで人が承認します。
-- タブを閉じる・ウィンドウを閉じると `claude attach` を切るだけで、指揮役と配下は止まりません。
-- 中央の端末で動かすのは `claude attach <短縮 ID>` だけで、相手は main プロセスが台帳と一覧から決めます（renderer からコマンドは走らせません）。
-- Clawd の AA は cc-park と同じ定義です。承認待ち = 右手が上下（黄）、作業中 = 足が動く（シアン）、
-  完了直後 = 両手（明るい緑）、入力待ち・停止 = 静止（灰）。指揮役は cuse の色で描きます。サブエージェントが動いていればミニキャラクターが並びます。
-- OS の「視差効果を減らす」がオンなら、AA は動きません。
 
 ## 台帳 `~/.cuse/ledger.json`
 
@@ -261,7 +222,7 @@ cuse が起動した指揮役と配下の記録で、cc-park など他のツー�
 | 同時に動かす配下の上限 | 3 |
 | 配下 1 つあたりの `prompt` の上限 | 20 |
 | 指揮役の名前 | `cuse-leader` |
-| 対応する Claude Code の最小バージョン | 2.1.139（指揮役は 2.1.224） |
+| 対応する Claude Code の最小バージョン | 2.1.224（指揮役が SendMessage を使うため） |
 | `cuse output` の既定の行数 | 20 |
 | `cuse wait` の既定の時間切れ | 110 秒 |
 
@@ -275,6 +236,8 @@ npm run build
 npm run gui:dev       # ビルドしてウィンドウを起動
 npm run gui:package   # .app にパッケージ化（macOS）
 ```
+
+開発中に端末から試すときは、`npm link` で `cuse` コマンドを入れ、`cuse start` / `cuse app` も使えます（配布はしません）。
 
 状態の読み取りや Clawd の AA は [cc-park](https://github.com/NaokiIshimura/cc-park) v0.25.0 から写しています
 （写したファイルの先頭に写し元とコミットがあります）。cuse は cc-park に依存しません。

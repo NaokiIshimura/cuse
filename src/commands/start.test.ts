@@ -46,7 +46,12 @@ describe('runStart', () => {
     // トークンは環境変数でだけ渡し、台帳にはハッシュだけを残す
     const token = tokenOf(args);
     expect(token).toMatch(/^[0-9a-f]{64}$/);
-    expect(call?.env).toEqual({ PATH: '/bin', [LEADER_TOKEN_ENV]: token });
+    // 指揮役の PATH の先頭に ~/.cuse/bin（cuse.app が cuse コマンドを置く場所）を足す
+    expect(call?.env).toEqual({ PATH: '/Users/example/.cuse/bin:/bin', [LEADER_TOKEN_ENV]: token });
+    const settingsAt = args.indexOf('--settings');
+    expect(JSON.parse(args[settingsAt + 1] ?? '{}')).toEqual({
+      env: { [LEADER_TOKEN_ENV]: token, PATH: '/Users/example/.cuse/bin:/bin' },
+    });
     expect(w.ledger.leader).toMatchObject({
       name: 'cuse-leader',
       shortId: '0001beef',

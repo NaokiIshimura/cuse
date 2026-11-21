@@ -14,7 +14,7 @@ import {
   type BackgroundLaunch,
 } from '../core/claudeBg.js';
 import type { LedgerLeader } from '../core/ledger.js';
-import { buildLeaderHome } from '../core/paths.js';
+import { buildCuseBin, buildLeaderHome, prependPath } from '../core/paths.js';
 import { createLeaderToken, hashLeaderToken, LEADER_TOKEN_ENV } from '../core/leaderToken.js';
 import type { Agent } from '../types/agent.js';
 import { listAgents, loadLedger, saveLedger, type OpsDeps } from './deps.js';
@@ -187,18 +187,21 @@ export const runStart = async (input: StartInput, deps: OpsDeps): Promise<Outcom
 
   // 起動・再開のたびにトークンを作り直す（古いトークンを持つプロセスを指揮役とみなさない）
   const token = createLeaderToken();
+  const leaderPath = prependPath(buildCuseBin(deps.home), deps.env['PATH']);
   const leaderPrompt = await deps.readBundled(LEADER_PROMPT_FILE);
   const launch: BackgroundLaunch = {
     ...(resuming ? { resume: current.sessionId, prompt: RESUME_LEADER_PROMPT } : { name: LEADER_NAME, prompt: INITIAL_LEADER_PROMPT }),
     permissionMode,
     disallowedTools: LEADER_DISALLOWED_TOOLS,
     appendSystemPrompt: leaderPrompt,
-    settings: { env: { [LEADER_TOKEN_ENV]: token } },
+    // 指揮役の PATH の先頭に ~/.cuse/bin を足す。cuse.app がそこに cuse コマンドを置くので、
+    // 人が CLI を入れていなくても、指揮役は Bash から cuse spawn などを使える
+    settings: { env: { [LEADER_TOKEN_ENV]: token, PATH: leaderPath } },
   };
   const launched = await launchBackground(launch, {
     runner: deps.runner,
     cwd,
-    env: { ...deps.env, [LEADER_TOKEN_ENV]: token },
+    env: { ...deps.env, [LEADER_TOKEN_ENV]: token, PATH: leaderPath },
   });
   if (!launched.ok) {
     return failure(launchFailure(launched.message, cwd, deps.home), warnings);

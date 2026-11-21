@@ -43,8 +43,6 @@ export interface GuiEnvironment {
   /** 同時に動かす配下の上限（仮の値） */
   readonly maxWorkers: number;
   readonly platform: string;
-  /** cuse の CLI が PATH にあるか（指揮役が cuse コマンドを使うため） */
-  readonly cliInstalled: boolean;
 }
 
 /** ポーリングのたびに取る一覧。 */
