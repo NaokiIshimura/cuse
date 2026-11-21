@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { CHARACTER_WIDTH, getFrame, getLeaderFrame } from '../../../../shared/characters.js';
+import { LEADER_BATON_COLUMN, getFrame, getLeaderFrame } from '../../../../shared/characters.js';
 import { STATE_LABELS_JA } from '../../../../shared/stateLabels.js';
 import type { Agent } from '../../../../types/agent.js';
 import type { CuseBridge } from '../../../ipc.js';
@@ -8,7 +8,7 @@ import type { TerminalLink } from '../../../../shared/terminalLinks.js';
 import { TerminalView } from '../TerminalView/index.js';
 
 /**
- * 指揮役の AA。右端の桁の指揮棒だけ色を変える（身体と同じ色だと、しっぽに見えるため）。
+ * 指揮役の AA。指揮棒の桁（いちばん左）だけ色を変える（身体と同じ色だと、指揮棒に見えないため）。
  */
 const LeaderAa = ({ text }: { readonly text: string }) => (
   <>
@@ -17,8 +17,9 @@ const LeaderAa = ({ text }: { readonly text: string }) => (
       return (
         // 行の中身はフレームごとに変わるので、行番号を鍵にする
         <span key={index}>
-          {cells.slice(0, CHARACTER_WIDTH).join('')}
-          <span className="character__baton">{cells.slice(CHARACTER_WIDTH).join('')}</span>
+          {cells.slice(0, LEADER_BATON_COLUMN).join('')}
+          <span className="character__baton">{cells[LEADER_BATON_COLUMN] ?? ' '}</span>
+          {cells.slice(LEADER_BATON_COLUMN + 1).join('')}
           {index < rows.length - 1 ? '\n' : ''}
         </span>
       );
