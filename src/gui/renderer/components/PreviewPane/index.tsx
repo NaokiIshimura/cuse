@@ -20,7 +20,16 @@ interface PreviewPaneProps {
   /** 追いかけ中か（固定していないか） */
   readonly following: boolean;
   readonly onToggleFollow: () => void;
+  /**
+   * 会話の中で押されたものを開く頼み（`key` は previewKey）。開けなかったときは `message`。
+   * 同じものを続けて押しても開き直せるよう、`nonce` を変えて渡す
+   */
+  readonly request?: PreviewRequest | null | undefined;
 }
+
+export type PreviewRequest =
+  | { readonly nonce: number; readonly key: string }
+  | { readonly nonce: number; readonly message: string };
 
 const itemTitle = (item: PreviewItem): string =>
   item.kind === 'file' ? (item.path.split('/').at(-1) ?? item.path) : item.url.replace(/^https?:\/\//, '');
@@ -157,12 +166,15 @@ const PreviewBody = ({
  * - 「固定」で追いかけを止める（いま見ているセッションのまま、自動では開かない）
  * - 開けるのはセッションに出てきたものだけ。中身は main が確かめてから読む
  */
-export const PreviewPane = ({ bridge, sessionId, sessionName, following, onToggleFollow }: PreviewPaneProps) => {
+export const PreviewPane = ({ bridge, sessionId, sessionName, following, onToggleFollow, request }: PreviewPaneProps) => {
   const [items, setItems] = useState<readonly PreviewItem[]>([]);
   const [tabs, setTabs] = useState<readonly string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
+  const [notice, setNotice] = useState<string | null>(null);
+  // 一覧を取り直すきっかけ（会話の中で押したものを、次の取り直しを待たずに出すため）
+  const [reload, setReload] = useState(0);
 
   // セッションが変わったら、開いていたものは閉じる（別のセッションのものを出し続けない）
   useEffect(() => {
@@ -171,6 +183,7 @@ export const PreviewPane = ({ bridge, sessionId, sessionName, following, onToggl
     setActiveKey(null);
     setResult(null);
     setRevealed(new Set());
+    setNotice(null);
   }, [sessionId]);
 
   useEffect(() => {
@@ -190,12 +203,26 @@ export const PreviewPane = ({ bridge, sessionId, sessionName, following, onToggl
       disposed = true;
       clearInterval(timer);
     };
-  }, [bridge, sessionId]);
+  }, [bridge, sessionId, reload]);
 
   const open = useCallback((key: string) => {
     setTabs((current) => (current.includes(key) ? current : [...current, key].slice(-MAX_TABS)));
     setActiveKey(key);
   }, []);
+
+  // 会話の中で押されたものを開く（セッションが変わって閉じたあとに開くよう、上の片付けより後に置く）
+  useEffect(() => {
+    if (request === null || request === undefined) {
+      return;
+    }
+    if ('key' in request) {
+      setNotice(null);
+      setReload((current) => current + 1);
+      open(request.key);
+    } else {
+      setNotice(request.message);
+    }
+  }, [request, open]);
 
   // 追いかけ中は、いちばん新しく出てきたものを開く
   const newestKey = items[0] === undefined ? null : previewKey(items[0]);
@@ -244,6 +271,11 @@ export const PreviewPane = ({ bridge, sessionId, sessionName, following, onToggl
       ) : (
         <>
           <p className="preview__session">{sessionName ?? ''} に出てきたもの</p>
+          {notice === null ? null : (
+            <p className="preview__notice" role="status">
+              {notice}
+            </p>
+          )}
           {tabs.length === 0 ? null : (
             <nav className="preview-tabs" role="tablist">
               {tabs.map((key) => {

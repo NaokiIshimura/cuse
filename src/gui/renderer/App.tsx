@@ -5,7 +5,7 @@ import type { Agent } from '../../types/agent.js';
 import type { CuseBridge, GuiEnvironment } from '../ipc.js';
 import type { LeaderStartup } from '../leaderStartup.js';
 import { CenterPane, type TerminalTab } from './components/CenterPane/index.js';
-import { PreviewPane } from './components/PreviewPane/index.js';
+import { PreviewPane, type PreviewRequest } from './components/PreviewPane/index.js';
 import { StopDialog } from './components/StopDialog/index.js';
 import { TopBar } from './components/TopBar/index.js';
 import { WorkerList } from './components/WorkerList/index.js';
@@ -45,6 +45,8 @@ export const App = ({ environment, bridge }: AppProps) => {
   const [cleanMessage, setCleanMessage] = useState<string | null>(null);
   // 右のプレビュー: 既定は中央で見ているセッションを追いかける。固定したらそのセッションのまま
   const [pinnedPreview, setPinnedPreview] = useState<{ readonly sessionId: string; readonly name: string } | null>(null);
+  // 会話の中で押されたファイル名・URL を、右のプレビューで開く頼み
+  const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
   const reducedMotion = useReducedMotion();
   const frame = useAnimationTick(ANIMATION_INTERVAL_MS, !reducedMotion);
 
@@ -147,6 +149,22 @@ export const App = ({ environment, bridge }: AppProps) => {
     });
   }, [bridge]);
 
+  /**
+   * 会話の中のファイル名・URL が押されたら、そのセッションのプレビューで開く。
+   * 別のセッションに固定していたら、押したセッションを追いかける表示に戻す。
+   */
+  const openLink = useCallback(
+    (tab: TerminalTab, link: { readonly text: string; readonly kind: 'url' | 'file' }) => {
+      void bridge.openPreviewLink(tab.sessionId, link.text, link.kind).then((result) => {
+        setPinnedPreview((current) => (current === null || current.sessionId === tab.sessionId ? current : null));
+        setPreviewRequest(
+          result.ok ? { nonce: Date.now(), key: result.key } : { nonce: Date.now(), message: result.message },
+        );
+      });
+    },
+    [bridge],
+  );
+
   const closeTab = useCallback((tabId: string) => {
     setOpenedTabs((current) => current.filter((tab) => tab.tabId !== tabId));
     setActiveTabId((current) => (current === tabId ? null : current));
@@ -202,12 +220,14 @@ export const App = ({ environment, bridge }: AppProps) => {
           onChooseLeaderFolder={() => {
             void bridge.chooseLeaderFolder();
           }}
+          onLink={openLink}
         />
         <PreviewPane
           bridge={bridge}
           sessionId={pinnedPreview?.sessionId ?? shownTab?.sessionId ?? null}
           sessionName={pinnedPreview?.name ?? shownTab?.title ?? null}
           following={pinnedPreview === null}
+          request={previewRequest}
           onToggleFollow={() => {
             setPinnedPreview((current) =>
               current !== null || shownTab === undefined

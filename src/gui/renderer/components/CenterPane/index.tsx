@@ -4,6 +4,7 @@ import { STATE_LABELS_JA } from '../../../../shared/stateLabels.js';
 import type { Agent } from '../../../../types/agent.js';
 import type { CuseBridge } from '../../../ipc.js';
 import type { LeaderStartup } from '../../../leaderStartup.js';
+import type { TerminalLink } from '../../../../shared/terminalLinks.js';
 import { TerminalView } from '../TerminalView/index.js';
 
 /**
@@ -50,6 +51,8 @@ interface CenterPaneProps {
   readonly onChooseLeaderFolder: () => void;
   /** まだ一度も配下を起こしていない（はじめて使う人に、何を書けばよいかを見せる） */
   readonly firstRequest: boolean;
+  /** 会話の中のファイル名・URL が押されたとき（右のプレビューに出す） */
+  readonly onLink?: ((tab: TerminalTab, link: Pick<TerminalLink, 'text' | 'kind'>) => void) | undefined;
 }
 
 /** 信頼してもらう端末のタブの ID。 */
@@ -148,17 +151,25 @@ const SessionTerminal = ({
   bridge,
   tab,
   active,
+  onLink,
 }: {
   readonly bridge: CuseBridge;
   readonly tab: TerminalTab;
   readonly active: boolean;
+  readonly onLink?: ((tab: TerminalTab, link: Pick<TerminalLink, 'text' | 'kind'>) => void) | undefined;
 }) => {
   const open = useCallback(
     (cols: number, rows: number) =>
       bridge.openTerminal({ tabId: tab.tabId, sessionId: tab.sessionId, cols, rows }),
     [bridge, tab.tabId, tab.sessionId],
   );
-  return <TerminalView bridge={bridge} tabId={tab.tabId} open={open} active={active} />;
+  const link = useCallback(
+    (clicked: Pick<TerminalLink, 'text' | 'kind'>) => {
+      onLink?.(tab, clicked);
+    },
+    [onLink, tab],
+  );
+  return <TerminalView bridge={bridge} tabId={tab.tabId} open={open} active={active} onLink={onLink === undefined ? undefined : link} />;
 };
 
 /**
@@ -177,6 +188,7 @@ export const CenterPane = ({
   onRetryLeader,
   onChooseLeaderFolder,
   firstRequest,
+  onLink,
 }: CenterPaneProps) => {
   const active = tabs.find((tab) => tab.tabId === activeTabId) ?? null;
   const agent = active === null ? undefined : agents.find((a) => a.sessionId === active.sessionId);
@@ -267,6 +279,7 @@ export const CenterPane = ({
             bridge={bridge}
             tab={tab}
             active={tab.tabId === activeTabId}
+            onLink={onLink}
           />
         ))}
       </div>

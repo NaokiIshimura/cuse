@@ -168,8 +168,8 @@ export const getMiniFrame = (frame: number): string => {
  * 指揮役（cuse-leader）の AA。cuse だけのもの（cc-park には無い）。
  *
  * 配下と同じ Clawd の右側（桁 9）に 1 桁足し、指揮棒を持たせる。
- * - 左手（桁 8）を上げているときは、手の右下から右上へ伸びる棒 `▞`（左下と右上の象限）を頭の行に置く
- * - 手を下ろしているときは、身体の端から右下へ伸びる棒 `▚`（左上と右下の象限）を身体の行に置く
+ * - ふだんは左手（桁 8）を上げ、手の右下から右上へ伸びる棒 `▞`（左下と右上の象限）を頭の行に置く
+ * - 作業中に振り下ろすときだけ手を下ろし、身体の端から右下へ伸びる棒 `▚`（左上と右下の象限）を身体の行に置く
  * どちらも手・身体の端と象限が隣り合い、棒が離れて見えない。
  * 作業中は、歩く代わりに指揮棒を振る（上げる → 下ろす）。
  */
@@ -180,27 +180,35 @@ export const LEADER_WIDTH = CHARACTER_WIDTH + 1;
 const BATON_UP = '▞';
 const BATON_DOWN = '▚';
 
-/** 配下の 1 フレームに指揮棒を足す。左手を上げていれば棒も上げる。 */
-const withBaton = (base: string): string => {
+/**
+ * 配下の 1 フレームに指揮棒を足す。
+ * 指揮役はふだん左手（桁 8）と指揮棒を上げておく（`raise`）。下ろすのは、作業中に振り下ろすときだけ。
+ */
+const withBaton = (base: string, raise: boolean): string => {
   const [head = '', body = '', legs = ''] = base.split('\n');
-  const raised = head[CHARACTER_WIDTH - 1] === RAISED;
+  const cells = [...head];
+  cells[CHARACTER_WIDTH - 1] = raise ? RAISED : cells[CHARACTER_WIDTH - 1] ?? LOWERED;
+  const raised = cells[CHARACTER_WIDTH - 1] === RAISED;
   return [
-    `${head}${raised ? BATON_UP : ' '}`,
+    `${cells.join('')}${raised ? BATON_UP : ' '}`,
     `${body}${raised ? ' ' : BATON_DOWN}`,
     `${legs} `,
   ].join('\n');
 };
 
 /** 作業中の指揮役は、指揮棒を上げ下げする。 */
-const LEADER_CONDUCTING: readonly string[] = [withBaton(frame('leftHand')), withBaton(frame('down'))];
+const LEADER_CONDUCTING: readonly string[] = [withBaton(frame('leftHand'), true), withBaton(frame('down'), false)];
 
-/** 指揮役の、状態とフレーム番号に対応する AA。 */
+/**
+ * 指揮役の、状態とフレーム番号に対応する AA。
+ * 作業中は指揮棒を振り、それ以外は配下と同じ動き（承認待ちに右手で呼ぶ、など）に、上げた指揮棒を足す。
+ */
 export const getLeaderFrame = (state: CharacterState, frame: number): string => {
   if (state === 'working') {
     const index = ((frame % LEADER_CONDUCTING.length) + LEADER_CONDUCTING.length) % LEADER_CONDUCTING.length;
     return LEADER_CONDUCTING[index] ?? '';
   }
-  return withBaton(getFrame(state, frame));
+  return withBaton(getFrame(state, frame), true);
 };
 
 /** 状態に対応する見た目を取得する。 */
