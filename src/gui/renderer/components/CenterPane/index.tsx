@@ -29,6 +29,8 @@ interface CenterPaneProps {
   readonly onRetryLeader: () => void;
   /** 指揮役を起こすフォルダを選ぶ */
   readonly onChooseLeaderFolder: () => void;
+  /** まだ一度も配下を起こしていない（はじめて使う人に、何を書けばよいかを見せる） */
+  readonly firstRequest: boolean;
 }
 
 /** 信頼してもらう端末のタブの ID。 */
@@ -60,21 +62,31 @@ const NoLeader = ({
   if (startup?.kind === 'failed' && startup.untrustedFolder !== null) {
     return (
       <div className="trust">
-        <div className="trust__guide">
-          <p className="placeholder__stage">初回だけ: 指揮役の居場所を Claude Code で信頼してください</p>
-          <p className="placeholder__description">
-            下に {startup.untrustedFolder} で動かした Claude Code が出ます。フォルダを信頼するか聞かれたら、信頼する方を選んでください。
-            選んだら「指揮役を起こす」を押します（下の Claude Code は閉じます）。次からは聞かれません。
-          </p>
+        <section className="trust__guide" role="alert" aria-label="初回だけ: 指揮役の居場所を信頼する">
+          <p className="trust__badge">初回だけ</p>
+          <h2 className="trust__title">指揮役の居場所を Claude Code で信頼してください</h2>
+          <ol className="trust__steps">
+            <li>
+              下の Claude Code が <code>{startup.untrustedFolder}</code> を信頼するか聞いてきます。
+              <strong>信頼する方（Yes）</strong>を選んでください。
+            </li>
+            <li>
+              信頼すると、自動で指揮役が起きます（下の Claude Code は閉じます）。下の Claude Code には何も打ち込まなくて大丈夫です。
+            </li>
+            <li>
+              起きないときは、<strong>「▶ 指揮役を起こす」</strong>を押してください。
+            </li>
+          </ol>
+          <p className="trust__note">次からは聞かれません。</p>
           <div className="placeholder__actions">
-            <button type="button" className="link-button" onClick={onRetry}>
-              指揮役を起こす
+            <button type="button" className="primary-button primary-button--pulse" onClick={onRetry}>
+              ▶ 指揮役を起こす
             </button>
             <button type="button" className="link-button link-button--quiet" onClick={onChooseFolder}>
               別のフォルダで起こす
             </button>
           </div>
-        </div>
+        </section>
         <div className="trust__terminal">
           <TerminalView bridge={bridge} tabId={TRUST_TAB_ID} open={openTrust} active />
         </div>
@@ -142,6 +154,7 @@ export const CenterPane = ({
   leaderStartup,
   onRetryLeader,
   onChooseLeaderFolder,
+  firstRequest,
 }: CenterPaneProps) => {
   const active = tabs.find((tab) => tab.tabId === activeTabId) ?? null;
   const agent = active === null ? undefined : agents.find((a) => a.sessionId === active.sessionId);
@@ -180,6 +193,16 @@ export const CenterPane = ({
               </div>
             </div>
           </header>
+          {active.role === 'leader' && firstRequest ? (
+            <div className="first-request" role="note">
+              <strong>ここから依頼します。</strong>
+              下の指揮役（Claude Code）に、やってほしいことを書いて Enter を押してください。
+              <span className="first-request__example">
+                例: 「~/work/app の README の誤字を直して、テストも足して。終わったら差分を見せて」
+              </span>
+              指揮役が配下を起こすと、左に並びます。承認が要るときは左のカードに「開いて承認する」が出ます。
+            </div>
+          ) : null}
           <nav className="tabs" role="tablist">
             {tabs.map((tab) => (
               <div

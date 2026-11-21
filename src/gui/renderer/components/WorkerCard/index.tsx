@@ -78,7 +78,12 @@ const WorkerCardComponent = ({ agent, frame, now, onOpen, onStop }: WorkerCardPr
         </div>
         {onOpen === undefined && onStop === undefined ? null : (
           <div className="worker-card__actions">
-            {onOpen === undefined ? null : (
+            {onOpen === undefined ? null : agent.state === 'blocked' ? (
+              // 承認待ちは、人が開いて承認しないと進まない。何をすればよいかをボタンの名前で伝える
+              <button type="button" className="approve-open-button" onClick={onOpen}>
+                開いて承認する
+              </button>
+            ) : (
               <button type="button" className="link-button" onClick={onOpen}>
                 開く
               </button>

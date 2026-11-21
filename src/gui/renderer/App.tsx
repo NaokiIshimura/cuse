@@ -18,9 +18,18 @@ const ANIMATION_INTERVAL_MS = 200;
 
 const NO_AGENTS: readonly Agent[] = [];
 
-/** 指揮役をそろえたときの警告（スキルが別の内容で置かれている、など）を上端に出す。 */
-const leaderNotices = (startup: LeaderStartup | undefined): readonly string[] =>
-  startup?.kind === 'ready' ? startup.warnings : [];
+/** CLI が無いときの知らせ。指揮役は Bash から cuse コマンドを使うので、無いと配下を起こせない。 */
+export const CLI_MISSING_NOTICE =
+  'cuse コマンドが見つかりません。指揮役が配下を起こすのに使うので、端末で npm install -g https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse.tgz を実行してください。';
+
+/** 上端に出す知らせ（CLI が無い、指揮役をそろえたときの警告など）。 */
+const leaderNotices = (
+  environment: GuiEnvironment,
+  startup: LeaderStartup | undefined,
+): readonly string[] => [
+  ...(environment.cliInstalled ? [] : [CLI_MISSING_NOTICE]),
+  ...(startup?.kind === 'ready' ? startup.warnings : []),
+];
 
 /** 指揮役のタブの ID。指揮役は 1 人なので固定にする。 */
 export const LEADER_TAB_ID = 'leader';
@@ -137,7 +146,7 @@ export const App = ({ environment, bridge }: AppProps) => {
         warnings={model.warnings}
         claudeVersion={environment.claudeVersion}
         fetchError={fetched !== undefined && !fetched.ok ? fetched.error.message : null}
-        notices={leaderNotices(snapshot?.leaderStartup)}
+        notices={leaderNotices(environment, snapshot?.leaderStartup)}
         leaderPending={snapshot === null || snapshot.leaderStartup.kind === 'starting'}
       />
       <main className="columns">
@@ -168,6 +177,7 @@ export const App = ({ environment, bridge }: AppProps) => {
           onSelect={setActiveTabId}
           onClose={closeTab}
           leaderStartup={snapshot?.leaderStartup ?? null}
+          firstRequest={ledger.kind !== 'ok' || ledger.ledger.workers.length === 0}
           onRetryLeader={() => {
             void bridge.ensureLeader();
           }}
@@ -182,7 +192,7 @@ export const App = ({ environment, bridge }: AppProps) => {
         />
       </main>
       <footer className="footer">
-        承認は、左で配下を「開く」と中央に出る Claude Code の画面で行います。ウィンドウを閉じても指揮役と配下は止まりません。
+        承認は、左のカードの「開いて承認する」で中央に出る Claude Code の画面で行います。ウィンドウを閉じても指揮役と配下は止まりません。
       </footer>
       {stopping === null ? null : (
         <StopDialog

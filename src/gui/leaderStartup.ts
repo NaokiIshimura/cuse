@@ -87,3 +87,29 @@ export const createLeaderStartup = (
     },
   };
 };
+
+/**
+ * 初回の信頼を待つ間に呼ぶ 1 回ぶんの確かめ。
+ *
+ * 「信頼していない」で止まっていて、そのフォルダを Claude Code が信頼したと読めたら、
+ * 人がボタンを押さなくても指揮役を起こす。読めなければ何もしない（ボタンで起こせる）。
+ * 起こしたら true。
+ */
+export const startWhenTrusted = async (
+  startup: { readonly status: () => LeaderStartup; readonly ensure: () => Promise<LeaderStartup> },
+  isTrusted: (folder: string) => Promise<boolean>,
+): Promise<boolean> => {
+  const status = startup.status();
+  if (status.kind !== 'failed' || status.untrustedFolder === null) {
+    return false;
+  }
+  if (!(await isTrusted(status.untrustedFolder))) {
+    return false;
+  }
+  // 読んでいる間に状態が変わっていたら（人がボタンを押したなど）、重ねて起こさない
+  if (startup.status() !== status) {
+    return false;
+  }
+  await startup.ensure();
+  return true;
+};

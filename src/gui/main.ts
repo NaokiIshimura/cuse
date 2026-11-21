@@ -23,7 +23,9 @@ import {
   type Snapshot,
   type StopWorkerResult,
 } from './ipc.js';
-import { createLeaderStartup } from './leaderStartup.js';
+import { createLeaderStartup, startWhenTrusted } from './leaderStartup.js';
+import { readFolderTrusted } from '../core/claudeTrust.js';
+import { execFileRunner } from '../core/runCommand.js';
 import { createTerminalManager } from './terminals.js';
 
 /**
@@ -88,9 +90,20 @@ const observeAgents = createAgentsObserver({
   },
 });
 
+/**
+ * cuse の CLI が PATH にあるか。指揮役は Bash から cuse コマンドを使うので、.app だけを入れた人には
+ * 入れ方を知らせる（起動時に 1 回だけ確かめる）。
+ */
+let cliInstalled = true;
+
 ipcMain.handle(
   IPC_CHANNELS.getEnvironment,
-  (): GuiEnvironment => ({ claudeVersion, maxWorkers: MAX_WORKERS, platform: process.platform }),
+  (): GuiEnvironment => ({
+    claudeVersion,
+    maxWorkers: MAX_WORKERS,
+    platform: process.platform,
+    cliInstalled,
+  }),
 );
 
 /**
@@ -203,6 +216,20 @@ ipcMain.handle(
   },
 );
 
+/**
+ * 初回の信頼を待つ間、Claude Code がフォルダを信頼したかを 1.5 秒ごとに読む。
+ * 信頼したと読めたら、人がボタンを押さなくても指揮役を起こす（読むだけで、書き込みはしない）。
+ */
+const TRUST_POLL_MS = 1500;
+setInterval(() => {
+  if (!terminals.has('trust')) {
+    return;
+  }
+  void startWhenTrusted(leaderStartup, (folder) =>
+    readFolderTrusted(folder, { home, env: process.env }),
+  );
+}, TRUST_POLL_MS).unref();
+
 ipcMain.on(IPC_CHANNELS.writeTerminal, (_event, tabId: unknown, data: unknown) => {
   if (typeof tabId === 'string' && typeof data === 'string') {
     terminals.write(tabId, data);
@@ -300,6 +327,10 @@ const preparePath = async (): Promise<void> => {
 
 const prepareVersion = async (): Promise<void> => {
   claudeVersion = await checkClaudeVersion();
+  cliInstalled = await execFileRunner('cuse', ['--version'], { timeoutMs: 5000, signal: undefined }).then(
+    () => true,
+    () => false,
+  );
 };
 
 /*

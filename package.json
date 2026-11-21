@@ -1,6 +1,6 @@
 {
   "name": "cuse",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "1 つの Claude Code セッション（指揮役）が、同じマシンのほかの Claude Code セッション（配下）を見守り・指揮するための CLI とデスクトップアプリ",
   "type": "module",
   "main": "dist/gui/main.js",
