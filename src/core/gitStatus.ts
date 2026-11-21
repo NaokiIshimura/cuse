@@ -15,6 +15,11 @@ export interface GitStatus {
   readonly upstream: string | null;
   /** commit していない変更（`git status --porcelain` の行） */
   readonly uncommitted: readonly string[];
+  /**
+   * `git status` を読めたか。読めなければ uncommitted が空でも「変更が無い」とは言えない
+   * （片付けると変更を失うおそれがあるので、clean は残す）。
+   */
+  readonly statusRead: boolean;
   /** push していない commit の数。数えられなければ null（＝分からない） */
   readonly unpushed: number | null;
   /** 取り込み先との差分（`git diff --stat <base>...HEAD` の最後の行）。比べられなければ null */
@@ -44,6 +49,7 @@ export const readGitStatus = async (dir: string, options: GitStatusOptions): Pro
       branch: null,
       upstream: null,
       uncommitted: [],
+      statusRead: false,
       unpushed: null,
       diffStat: null,
       base: null,
@@ -72,6 +78,7 @@ export const readGitStatus = async (dir: string, options: GitStatusOptions): Pro
     branch: branch === '' ? null : branch,
     upstream: upstream === '' ? null : upstream,
     uncommitted: (status ?? '').split('\n').filter((line) => line.trim() !== ''),
+    statusRead: status !== null,
     unpushed: unpushed === null || Number.isNaN(unpushed) ? null : unpushed,
     diffStat: stat === null || stat === '' ? null : (stat.split('\n').at(-1)?.trim() ?? null),
     base,
@@ -85,7 +92,7 @@ export const readGitStatus = async (dir: string, options: GitStatusOptions): Pro
  * git リポジトリでない場所は worktree が作られないので、片付けても失うものは無い（セッションの一覧から外すだけ）。
  */
 export const isSafeToClean = (status: GitStatus): boolean =>
-  !status.repository || (status.uncommitted.length === 0 && status.unpushed === 0);
+  !status.repository || (status.statusRead && status.uncommitted.length === 0 && status.unpushed === 0);
 
 /** 残す理由（人と指揮役に伝える）。片付けてよければ null。 */
 export const keepReason = (status: GitStatus): string | null => {
@@ -93,6 +100,9 @@ export const keepReason = (status: GitStatus): string | null => {
     return null;
   }
   const reasons: string[] = [];
+  if (!status.statusRead) {
+    reasons.push('commit していない変更があるか確かめられない（git status に失敗した）');
+  }
   if (status.uncommitted.length > 0) {
     reasons.push(`commit していない変更が ${status.uncommitted.length} 件`);
   }

@@ -212,7 +212,7 @@ background セッションを起こす常駐プロセスが環境変数を引き
 
 `cuse kill --json` は `name` / `shortId` / `reason` / `endedAt` を返します。
 
-`cuse review --json` は `name` / `sessionId` / `shortId` / `state` / `task` / `workDir` / `git`（`repository` / `branch` / `upstream` / `uncommitted` / `unpushed` / `diffStat` / `base`）/ `pullRequest`（`number` / `url` / `state`。無ければ `null`）/ `lastReport` / `keep`（片付けると失うものの説明。失わなければ `null`）を返します。
+`cuse review --json` は `name` / `sessionId` / `shortId` / `state` / `task` / `workDir` / `git`（`repository` / `branch` / `upstream` / `uncommitted` / `statusRead`（`git status` を読めたか）/ `unpushed` / `diffStat` / `base`）/ `pullRequest`（`number` / `url` / `state`。無ければ `null`）/ `lastReport` / `keep`（片付けると失うものの説明。失わなければ `null`）を返します。
 
 `cuse clean --json` は `cleaned`（`name` / `shortId`）/ `kept`（`name` / `reason`）/ `running`（まだ動いている配下の名前）を返します。
 

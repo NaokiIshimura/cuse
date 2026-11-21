@@ -91,4 +91,28 @@ describe('runPrompt', () => {
     const outcome = await runPrompt({ name: 'tests', message: 'x' }, w.deps);
     expect(!outcome.ok && outcome.error.kind).toBe('denied');
   });
+
+  it('片付けた配下には続きを頼まない（claude は呼ばない）', async () => {
+    const w = world(stopped);
+    w.ledger = {
+      ...w.ledger,
+      workers: w.ledger.workers.map((worker) => ({ ...worker, cleanedAt: '2026-11-20T00:00:00.000Z' })),
+    };
+    const outcome = await runPrompt({ name: 'tests', message: 'x' }, w.deps);
+    expect(!outcome.ok && outcome.error.kind).toBe('conflict');
+    expect(bgCalls(w)).toEqual([]);
+  });
+
+  it('同じ名前の片付けた配下があっても、片付けていない方に決まる', async () => {
+    const w = world(stopped);
+    w.ledger = {
+      ...w.ledger,
+      workers: [
+        makeWorker({ name: 'tests', shortId: 'gone', sessionId: 'gone-session', cleanedAt: '2026-11-20T00:00:00.000Z' }),
+        ...w.ledger.workers,
+      ],
+    };
+    const outcome = await runPrompt({ name: 'tests', message: 'x' }, w.deps);
+    expect(outcome.ok && outcome.value).toMatchObject({ delivered: true, sessionId: 'tests-session' });
+  });
 });

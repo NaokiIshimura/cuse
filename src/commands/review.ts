@@ -39,10 +39,17 @@ export const readWorkDir = async (
   sessionId: string,
   cwd: string,
   deps: Pick<OpsDeps, 'readTranscript'>,
-): Promise<{ readonly workDir: string; readonly lastReport: string | null }> => {
+): Promise<{
+  readonly workDir: string;
+  /** transcript から作業した場所を読めたか。読めなければ workDir は起動した場所で、worktree とは限らない */
+  readonly workDirKnown: boolean;
+  readonly lastReport: string | null;
+}> => {
   const transcript = cwd === '' ? null : await deps.readTranscript(cwd, sessionId);
+  const lastCwd = transcript === null ? undefined : findLastCwd(transcript);
   return {
-    workDir: (transcript === null ? undefined : findLastCwd(transcript)) ?? cwd,
+    workDir: lastCwd ?? cwd,
+    workDirKnown: lastCwd !== undefined,
     lastReport: transcript === null ? null : (findLastAssistantText(transcript) ?? null),
   };
 };

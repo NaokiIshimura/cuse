@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -68,5 +68,12 @@ describe('readPreviewContent', () => {
     await writeFile(join(dir, 'b.bin'), Buffer.from([1, 0, 2]));
     expect((await read(join(dir, 'missing.ts'))).kind).toBe('unavailable');
     expect(await read(join(dir, 'b.bin'))).toEqual({ kind: 'unavailable', message: 'バイナリのファイルなので出しません。' });
+  });
+
+  it('名前がふつうでも、リンクの先が鍵のファイルなら伏せる', async () => {
+    const dir = await tempDir();
+    await writeFile(join(dir, 'id_ed25519'), 'secret');
+    await symlink(join(dir, 'id_ed25519'), join(dir, 'notes.txt'));
+    expect(await read(join(dir, 'notes.txt'))).toEqual({ kind: 'masked' });
   });
 });

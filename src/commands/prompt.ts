@@ -64,6 +64,13 @@ export const runPrompt = async (input: PromptInput, deps: OpsDeps): Promise<Outc
     );
   }
   const worker = resolved.item;
+  // 片付けた配下は claude rm 済みで、worktree も消えていることがある。再開すると別の場所で続きを始めてしまう
+  if (worker.cleanedAt !== null) {
+    return failure({
+      kind: 'conflict',
+      message: `${worker.name} は片付け済みです（cuse clean）。続きを頼むなら、cuse spawn で新しい配下を起こしてください。`,
+    });
+  }
   if (worker.promptCount >= MAX_PROMPTS_PER_WORKER) {
     return failure({
       kind: 'limit',

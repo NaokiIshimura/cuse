@@ -122,4 +122,15 @@ describe('runReview', () => {
   it('知らない名前は not-found', async () => {
     expect(await runReview({ name: 'nothing' }, world().deps)).toMatchObject({ ok: false, error: { kind: 'not-found' } });
   });
+
+  it('transcript が読めず worktree が分からない配下は、claude rm せずに残す', async () => {
+    const w = world();
+    w.transcripts.delete('done-clean-session');
+    const outcome = await runClean({}, w.deps);
+    expect(outcome.ok && outcome.value.kept).toContainEqual({
+      name: 'done-clean',
+      reason: '作業した場所（worktree）を transcript から確かめられない',
+    });
+    expect(rmCalls(w)).not.toContain('done-clean-id');
+  });
 });

@@ -64,9 +64,20 @@ export const checkLeader = (env: NodeJS.ProcessEnv, ledger: Ledger | null): Lead
   return { ok: false, message: DENIED };
 };
 
-/** 配下へ渡す環境。指揮役のトークンを外す（配下が指揮役のコマンドを使えないように）。 */
+/**
+ * 内部の cuse コマンド（`~/.cuse/bin/cuse`）が Electron を Node として動かすための環境変数。
+ * cuse から起こした配下へ残ると、配下が Bash から起こす Electron アプリ（作業中のアプリなど）まで
+ * Node として動いてしまうので、配下へは渡さない。
+ */
+export const ELECTRON_RUN_AS_NODE_ENV = 'ELECTRON_RUN_AS_NODE';
+
+/**
+ * 配下へ渡す環境。指揮役のトークンを外す（配下が指揮役のコマンドを使えないように）。
+ * cuse コマンドを動かすためだけの `ELECTRON_RUN_AS_NODE` も外す。
+ */
 export const withoutLeaderToken = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
   const next = { ...env };
   delete next[LEADER_TOKEN_ENV];
+  delete next[ELECTRON_RUN_AS_NODE_ENV];
   return next;
 };

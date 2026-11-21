@@ -113,4 +113,20 @@ describe('readPullRequest', () => {
       }),
     ).toBeNull();
   });
+
+  it('git status に失敗したら、変更が無いとはみなさず残す', async () => {
+    const runner = async (_command: string, args: readonly string[]) => {
+      const rest = args.slice(2).join(' ');
+      if (rest === 'rev-parse --is-inside-work-tree') return 'true\n';
+      if (rest === 'status --porcelain') throw new Error('index.lock');
+      if (rest.startsWith('rev-parse --abbrev-ref --symbolic')) return 'origin/main\n';
+      if (rest.startsWith('rev-parse --abbrev-ref')) return 'main\n';
+      if (rest.startsWith('rev-list')) return '0\n';
+      return '';
+    };
+    const result = await readGitStatus('/w', { runner });
+    expect(result.statusRead).toBe(false);
+    expect(isSafeToClean(result)).toBe(false);
+    expect(keepReason(result)).toContain('git status に失敗した');
+  });
 });

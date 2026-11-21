@@ -431,7 +431,7 @@ ipcMain.handle(
       return { ok: false, message: '止める理由を書いてください。' };
     }
     const outcome = await runKill(
-      { name: sessionId, reason: `人がウィンドウから止めた: ${reason.trim()}`, byHuman: true },
+      { name: sessionId, sessionId, reason: `人がウィンドウから止めた: ${reason.trim()}`, byHuman: true },
       defaultDeps(),
     );
     return outcome.ok
