@@ -18,7 +18,7 @@ import { createLeaderToken, hashLeaderToken, LEADER_TOKEN_ENV } from '../core/le
 import type { Agent } from '../types/agent.js';
 import { listAgents, loadLedger, saveLedger, type OpsDeps } from './deps.js';
 import { describeInstallSkill, installSkill, SKILL_SOURCE, type InstallSkillResult } from './installSkill.js';
-import { failure, success, withWarnings, type Outcome } from './outcome.js';
+import { failure, success, withWarnings, type CommandError, type Outcome } from './outcome.js';
 
 /**
  * `cuse start [--cwd] [--new] [--permission-mode]`。
@@ -68,6 +68,23 @@ const ACTION_TEXT: Readonly<Record<StartAction, string>> = {
   started: '指揮役を起動しました。',
   resumed: '止まっていた指揮役を再開しました（同じ会話の続き）。',
   recreated: '指揮役を作り直しました（前の指揮役は止めました。配下は引き継ぎます）。',
+};
+
+/**
+ * 指揮役を起こせなかった理由を、人が次に何をすればよいか分かる形にする。
+ *
+ * Claude Code は、信頼していないフォルダでは background セッションを起こさない。
+ * ホームフォルダは特に「1 度に 1 セッションだけ」信頼されるので、指揮役の置き場所には使えない。
+ */
+export const launchFailure = (message: string, cwd: string, home: string): CommandError => {
+  if (/not trusted/i.test(message)) {
+    const where =
+      cwd === home
+        ? 'ホームフォルダでは指揮役を起こせません（Claude Code がホームフォルダを信頼するのは 1 度に 1 セッションだけのため）。作業するリポジトリなど、別のフォルダを選んでください。'
+        : `フォルダ ${cwd} を Claude Code がまだ信頼していません。端末でそのフォルダに移って claude を一度起動し、信頼してから、もう一度試してください。`;
+    return { kind: 'untrusted', message: `${where}（Claude Code: ${message}）` };
+  }
+  return { kind: 'launch', message: `指揮役を起こせませんでした: ${message}` };
 };
 
 const findLeaderAgent = (agents: readonly Agent[], leader: LedgerLeader): Agent | undefined =>
@@ -169,7 +186,7 @@ export const runStart = async (input: StartInput, deps: OpsDeps): Promise<Outcom
     env: { ...deps.env, [LEADER_TOKEN_ENV]: token },
   });
   if (!launched.ok) {
-    return failure({ kind: 'launch', message: launched.message }, warnings);
+    return failure(launchFailure(launched.message, cwd, deps.home), warnings);
   }
   const found = await findByShortId(
     async () => {

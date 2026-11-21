@@ -71,6 +71,7 @@ const makeBridge = (snapshot: Snapshot) => {
   const closed: string[] = [];
   const stopped: [string, string][] = [];
   let ensured = 0;
+  let chosen = 0;
   const bridge: CuseBridge = {
     getEnvironment: async () => environment,
     getSnapshot: async () => snapshot,
@@ -93,8 +94,12 @@ const makeBridge = (snapshot: Snapshot) => {
       ensured += 1;
       return { kind: 'starting' };
     },
+    chooseLeaderFolder: async () => {
+      chosen += 1;
+      return { kind: 'starting' };
+    },
   };
-  return { bridge, opened, closed, stopped, ensured: () => ensured };
+  return { bridge, opened, closed, stopped, ensured: () => ensured, chosen: () => chosen };
 };
 
 beforeEach(() => {
@@ -180,7 +185,7 @@ describe('App', () => {
   it('指揮役を起こせなければ理由を出し、もう一度頼める', async () => {
     const { bridge, ensured } = makeBridge({
       ...missingSnapshot,
-      leaderStartup: { kind: 'failed', message: 'Claude Code v2.1.200 は古いです' },
+      leaderStartup: { kind: 'failed', message: 'Claude Code v2.1.200 は古いです', untrusted: false },
     });
     const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
     await flush();
@@ -188,6 +193,28 @@ describe('App', () => {
     expect(container.textContent).toContain('Claude Code v2.1.200 は古いです');
     fireEvent.click(getByText('もう一度'));
     expect(ensured()).toBe(1);
+  });
+
+  it('置き場所が決まっていなければ、フォルダを選んでもらう', async () => {
+    const { bridge, chosen } = makeBridge({ ...missingSnapshot, leaderStartup: { kind: 'needs-folder' } });
+    const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
+    await flush();
+    expect(container.textContent).toContain('指揮役を起こすフォルダを選んでください');
+    expect(container.textContent).toContain('ホームフォルダ');
+    fireEvent.click(getByText('フォルダを選ぶ'));
+    expect(chosen()).toBe(1);
+  });
+
+  it('信頼されていないフォルダで起こせなければ、「もう一度」ではなくフォルダを選び直してもらう', async () => {
+    const { bridge, chosen } = makeBridge({
+      ...missingSnapshot,
+      leaderStartup: { kind: 'failed', message: 'ホームフォルダでは指揮役を起こせません', untrusted: true },
+    });
+    const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
+    await flush();
+    expect(container.textContent).not.toContain('もう一度');
+    fireEvent.click(getByText('フォルダを選び直す'));
+    expect(chosen()).toBe(1);
   });
 
   it('指揮役を起こしたときの警告を上端に出す', async () => {

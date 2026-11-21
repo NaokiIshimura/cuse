@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, shell, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, type WebContents } from 'electron';
 import { spawn as spawnPty } from 'node-pty';
 import { runKill } from '../commands/kill.js';
 import { runStart } from '../commands/start.js';
@@ -96,11 +96,40 @@ ipcMain.handle(
  * アプリを開いたら指揮役をそろえる（`cuse start` と同じ処理）。
  * 指揮役がいなければ起こし、止まっていれば再開し、動いていれば何もしない。
  */
-const leaderStartup = createLeaderStartup(() =>
-  runStart({ cwd: startupCwd(process.cwd(), home) }, defaultDeps()),
-);
+const leaderStartup = createLeaderStartup({
+  start: (cwd) => runStart({ cwd }, defaultDeps()),
+  hasLeader: async () => {
+    const ledger = await readLedger({ home });
+    return ledger.kind === 'ok' && ledger.ledger.leader !== null;
+  },
+  initialCwd: startupCwd(process.cwd(), home),
+});
 
 ipcMain.handle(IPC_CHANNELS.ensureLeader, () => leaderStartup.ensure());
+
+/**
+ * 指揮役を起こすフォルダを選んでもらう。
+ *
+ * Finder から開いたときは置き場所が分からず、ホームフォルダは Claude Code が指揮役に使わせないので、
+ * 作業するリポジトリなどを人に選んでもらう。
+ */
+ipcMain.handle(IPC_CHANNELS.chooseLeaderFolder, async (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const options = {
+    title: '指揮役を起こすフォルダ',
+    message: '指揮役を起こすフォルダを選んでください（作業するリポジトリなど。ホームフォルダは使えません）',
+    buttonLabel: 'ここで起こす',
+    defaultPath: home,
+    properties: ['openDirectory' as const],
+  };
+  const picked =
+    window === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(window, options);
+  const folder = picked.canceled ? undefined : picked.filePaths[0];
+  if (folder === undefined) {
+    return leaderStartup.status();
+  }
+  return leaderStartup.ensure(folder);
+});
 
 ipcMain.handle(IPC_CHANNELS.getSnapshot, async (): Promise<Snapshot> => {
   // transcript の読み取りは node 側でしかできないため、ここで合成して renderer へ返す

@@ -22,7 +22,9 @@ export type CommandErrorKind =
   /** 台帳を読めない・書けない */
   | 'ledger'
   /** Claude Code が古い */
-  | 'version';
+  | 'version'
+  /** そのフォルダを Claude Code がまだ信頼していない（ホームフォルダなど） */
+  | 'untrusted';
 
 export interface CommandError {
   readonly kind: CommandErrorKind;

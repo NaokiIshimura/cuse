@@ -108,6 +108,27 @@ describe('runStart', () => {
     expect(bgCalls(w)).toEqual([]);
   });
 
+  it('信頼されていないフォルダ（ホームなど）では、次にすることを伝える。トークンや心得は出さない', async () => {
+    const w = createFakeWorld({ cwd: '/Users/example' });
+    w.untrusted.add('/Users/example');
+    const outcome = await runStart({}, w.deps);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.error.kind).toBe('untrusted');
+    expect(outcome.error.message).toContain('ホームフォルダでは指揮役を起こせません');
+    expect(outcome.error.message).toContain('Workspace not trusted');
+    expect(outcome.error.message).not.toContain('CUSE_LEADER_TOKEN');
+    expect(outcome.error.message).not.toContain('心得');
+    expect(w.ledger.leader).toBeNull();
+  });
+
+  it('ホーム以外の信頼されていないフォルダでは、信頼のしかたを伝える', async () => {
+    const w = createFakeWorld({ cwd: '/Users/example/new-repo' });
+    w.untrusted.add('/Users/example/new-repo');
+    const outcome = await runStart({}, w.deps);
+    expect(!outcome.ok && outcome.error.message).toContain('/Users/example/new-repo を Claude Code がまだ信頼していません');
+  });
+
   it('権限確認を飛ばすモードは受け付けない', async () => {
     const w = createFakeWorld();
     const outcome = await runStart({ permissionMode: 'bypassPermissions' }, w.deps);

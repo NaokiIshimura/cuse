@@ -40,6 +40,7 @@ const bridge: CuseBridge = {
   stopWorker: (sessionId: string, reason: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.stopWorker, sessionId, reason),
   ensureLeader: () => ipcRenderer.invoke(IPC_CHANNELS.ensureLeader),
+  chooseLeaderFolder: () => ipcRenderer.invoke(IPC_CHANNELS.chooseLeaderFolder),
 };
 
 contextBridge.exposeInMainWorld('cuse', bridge);

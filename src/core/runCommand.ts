@@ -41,9 +41,10 @@ export const execFileRunner: CommandRunner = (command, args, options) =>
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
         ...(options.env === undefined ? {} : { env: options.env }),
       },
-      (error, stdout) => {
+      (error, stdout, stderr) => {
         if (error) {
-          reject(error);
+          // cuse で足した: 失敗の理由を伝えるため、標準エラーを添える（toCommandError が使う）
+          reject(Object.assign(error, { stderr }));
           return;
         }
         resolve(stdout);
@@ -56,7 +57,11 @@ export const execFileRunner: CommandRunner = (command, args, options) =>
  * UI 側で対処法を出し分けられるよう、メッセージだけでなく kind を持たせる。
  */
 export const toCommandError = (error: unknown, timeoutMessage: string): CommandError => {
-  const candidate = error as NodeJS.ErrnoException & { killed?: boolean; signal?: string };
+  const candidate = error as NodeJS.ErrnoException & {
+    killed?: boolean;
+    signal?: string;
+    stderr?: unknown;
+  };
   const message = candidate?.message ?? String(error);
 
   if (candidate?.code === 'ENOENT') {
@@ -71,5 +76,27 @@ export const toCommandError = (error: unknown, timeoutMessage: string): CommandE
   if (candidate?.killed === true || candidate?.signal === 'SIGTERM') {
     return { kind: 'timeout', message: timeoutMessage };
   }
-  return { kind: 'exit', message };
+  return { kind: 'exit', message: exitMessage(candidate, message) };
+};
+
+/**
+ * cuse で足した: 終了コード 0 以外で終わったときの説明。
+ *
+ * execFile の `Command failed: <コマンド全体>` をそのまま出すと、指揮役のトークン（`--settings`）や
+ * 心得の全文（`--append-system-prompt`）が画面に出てしまう。標準エラーがあればそれを、
+ * 無ければ終了コードだけを伝える。
+ */
+const exitMessage = (
+  candidate: { readonly stderr?: unknown; readonly code?: unknown } | null | undefined,
+  message: string,
+): string => {
+  const stderr = typeof candidate?.stderr === 'string' ? candidate.stderr.trim() : '';
+  if (stderr !== '') {
+    return stderr;
+  }
+  if (message.startsWith('Command failed:')) {
+    const code = candidate?.code;
+    return typeof code === 'number' ? `コマンドが終了コード ${code} で失敗しました。` : 'コマンドが失敗しました。';
+  }
+  return message;
 };

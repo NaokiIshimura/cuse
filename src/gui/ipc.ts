@@ -31,6 +31,8 @@ export const IPC_CHANNELS = {
   stopWorker: 'worker:stop',
   /** 指揮役をそろえ直す（起こせなかったときの「もう一度」） */
   ensureLeader: 'leader:ensure',
+  /** 指揮役を起こすフォルダを人に選んでもらい、そこで起こす */
+  chooseLeaderFolder: 'leader:chooseFolder',
 } as const;
 
 /** 起動時に 1 回だけ取る環境。 */
@@ -84,4 +86,6 @@ export interface CuseBridge {
   readonly onTerminalExit: (listener: (tabId: string, exitCode: number) => void) => () => void;
   readonly stopWorker: (sessionId: string, reason: string) => Promise<StopWorkerResult>;
   readonly ensureLeader: () => Promise<LeaderStartup>;
+  /** フォルダを選ぶダイアログを出し、選ばれたらそこで指揮役を起こす。取り消したらいまの状態を返す */
+  readonly chooseLeaderFolder: () => Promise<LeaderStartup>;
 }

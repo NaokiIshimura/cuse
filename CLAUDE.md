@@ -99,6 +99,11 @@ IPC の口は `src/gui/ipc.ts` にまとめる。承認の口は作らない。
 
 ウィンドウを開くと main が `runStart`（`cuse start` と同じ処理）で指揮役をそろえる（`src/gui/leaderStartup.ts`）。
 重ねて走らせないようにしてあり、指揮役がマシンに 1 人という約束はそのまま守られる。`.app` にも `prompts/` と `skill/` を入れる。
+新しく起こす置き場所が決まらないとき（Finder から開いた・ホームフォルダ）は起こさず、人にフォルダを選んでもらう。
+Claude Code はホームフォルダや信頼していないフォルダでは `claude --bg` を断る。
+
+`claude` の失敗の理由は標準エラーから取る（`toCommandError`）。execFile の `Command failed: <コマンド全体>` には
+指揮役のトークンや心得の全文が入るので、画面やログにそのまま出さない。
 
 埋め込み端末（node-pty）で動かすのは `claude attach <短縮 ID>` だけ。相手は main が台帳と一覧から決め（`src/gui/attachTarget.ts`）、
 renderer から来た値でコマンドを組み立てない。タブやウィンドウを閉じても attach を切るだけで、セッションは止めない。

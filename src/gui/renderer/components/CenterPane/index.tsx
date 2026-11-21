@@ -26,27 +26,54 @@ interface CenterPaneProps {
   readonly leaderStartup: LeaderStartup | null;
   /** 指揮役を起こせなかったときに、もう一度頼む */
   readonly onRetryLeader: () => void;
+  /** 指揮役を起こすフォルダを選ぶ */
+  readonly onChooseLeaderFolder: () => void;
 }
 
 /**
- * 指揮役のタブが出るまでの案内。アプリを開くと指揮役を起こすので、たいていは「起こしています」。
- * 起こせなかったときは理由と「もう一度」を出す。
+ * 指揮役のタブが出るまでの案内。
+ *
+ * - 起こしている途中: その旨
+ * - 置き場所が決まっていない: フォルダを選んでもらう（ホームフォルダは使えない）
+ * - 起こせなかった: 理由と「もう一度」「別のフォルダを選ぶ」
  */
 const NoLeader = ({
   startup,
   onRetry,
+  onChooseFolder,
 }: {
   readonly startup: LeaderStartup | null;
   readonly onRetry: () => void;
+  readonly onChooseFolder: () => void;
 }) => (
   <div className="placeholder__body">
     {startup?.kind === 'failed' ? (
       <>
         <p className="placeholder__stage">指揮役を起こせませんでした</p>
-        <p className="placeholder__description">{startup.message}</p>
-        <button type="button" className="link-button" onClick={onRetry}>
-          もう一度
-        </button>
+        <p className="placeholder__description placeholder__description--error">{startup.message}</p>
+        <div className="placeholder__actions">
+          {startup.untrusted ? null : (
+            <button type="button" className="link-button" onClick={onRetry}>
+              もう一度
+            </button>
+          )}
+          <button type="button" className="link-button" onClick={onChooseFolder}>
+            {startup.untrusted ? 'フォルダを選び直す' : '別のフォルダを選ぶ'}
+          </button>
+        </div>
+      </>
+    ) : startup?.kind === 'needs-folder' ? (
+      <>
+        <p className="placeholder__stage">指揮役を起こすフォルダを選んでください</p>
+        <p className="placeholder__description">
+          作業するリポジトリなどを選ぶと、そこで指揮役 cuse-leader を起こします。ホームフォルダは Claude Code
+          が指揮役に使わせないので選べません。配下は指揮役が cuse spawn --cwd でほかのリポジトリにも回せます。
+        </p>
+        <div className="placeholder__actions">
+          <button type="button" className="link-button" onClick={onChooseFolder}>
+            フォルダを選ぶ
+          </button>
+        </div>
       </>
     ) : (
       <>
@@ -73,6 +100,7 @@ export const CenterPane = ({
   onClose,
   leaderStartup,
   onRetryLeader,
+  onChooseLeaderFolder,
 }: CenterPaneProps) => {
   const active = tabs.find((tab) => tab.tabId === activeTabId) ?? null;
   const agent = active === null ? undefined : agents.find((a) => a.sessionId === active.sessionId);
@@ -81,7 +109,11 @@ export const CenterPane = ({
   return (
     <section className="center-pane" aria-label="会話">
       {active === null ? (
-        <NoLeader startup={leaderStartup} onRetry={onRetryLeader} />
+        <NoLeader
+          startup={leaderStartup}
+          onRetry={onRetryLeader}
+          onChooseFolder={onChooseLeaderFolder}
+        />
       ) : (
         <>
           <header className="center-pane__header">

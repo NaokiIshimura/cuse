@@ -38,6 +38,23 @@ describe('toCommandError', () => {
     });
   });
 
+  it('標準エラーがあれば、それを理由にする', () => {
+    const error = Object.assign(new Error('Command failed: claude --bg --settings {"env":{"CUSE_LEADER_TOKEN":"secret"}}'), {
+      code: 1,
+      stderr: 'Workspace not trusted.\n',
+    });
+    expect(toCommandError(error, TIMEOUT_MESSAGE)).toEqual({ kind: 'exit', message: 'Workspace not trusted.' });
+  });
+
+  it('コマンド全体（トークンや心得を含む）を理由に出さない', () => {
+    const error = Object.assign(new Error('Command failed: claude --bg --settings {"env":{"CUSE_LEADER_TOKEN":"secret"}}'), {
+      code: 2,
+    });
+    const { message } = toCommandError(error, TIMEOUT_MESSAGE);
+    expect(message).toBe('コマンドが終了コード 2 で失敗しました。');
+    expect(message).not.toContain('secret');
+  });
+
   it('Error 以外でも文字列化して扱う', () => {
     expect(toCommandError('plain failure', TIMEOUT_MESSAGE)).toEqual({
       kind: 'exit',
@@ -86,5 +103,15 @@ describe('execFileRunner', () => {
     });
     controller.abort();
     await expect(promise).rejects.toBeDefined();
+  });
+});
+
+describe('execFileRunner（本物の子プロセス）', () => {
+  it('失敗したとき、標準エラーを理由として受け取れる', async () => {
+    const error = await execFileRunner('sh', ['-c', 'echo oops >&2; exit 3'], {
+      timeoutMs: 5000,
+      signal: undefined,
+    }).catch((caught: unknown) => caught);
+    expect(toCommandError(error, 'timeout')).toEqual({ kind: 'exit', message: 'oops' });
   });
 });
