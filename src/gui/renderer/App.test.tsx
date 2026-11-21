@@ -45,6 +45,7 @@ const missingSnapshot: Snapshot = {
     ],
   },
   ledger: { kind: 'missing' },
+  leaderStartup: { kind: 'starting' },
   at: 0,
 };
 
@@ -61,6 +62,7 @@ const leaderSnapshot: Snapshot = {
     kind: 'ok',
     ledger: makeLedger({ leader: makeLeader(), workers: [makeWorker({ name: 'tests' })] }),
   },
+  leaderStartup: { kind: 'ready', action: 'opened', warnings: [] },
   at: 0,
 };
 
@@ -68,6 +70,7 @@ const makeBridge = (snapshot: Snapshot) => {
   const opened: OpenTerminalRequest[] = [];
   const closed: string[] = [];
   const stopped: [string, string][] = [];
+  let ensured = 0;
   const bridge: CuseBridge = {
     getEnvironment: async () => environment,
     getSnapshot: async () => snapshot,
@@ -86,8 +89,12 @@ const makeBridge = (snapshot: Snapshot) => {
       stopped.push([sessionId, reason]);
       return { ok: true, message: '止めました' };
     },
+    ensureLeader: async () => {
+      ensured += 1;
+      return { kind: 'starting' };
+    },
   };
-  return { bridge, opened, closed, stopped };
+  return { bridge, opened, closed, stopped, ensured: () => ensured };
 };
 
 beforeEach(() => {
@@ -113,7 +120,8 @@ describe('App', () => {
     const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
     await flush();
     expect(container.textContent).toContain('台帳（~/.cuse/ledger.json）がまだ無い');
-    expect(container.textContent).toContain('指揮役がいません');
+    // アプリを開くと指揮役を起こすので、その間は「起こしています」
+    expect(container.textContent).toContain('cuse-leader を起こしています');
 
     fireEvent.click(getByText('マシン上の全セッションを表示'));
     expect(container.textContent).toContain('ALL SESSIONS');
@@ -167,6 +175,29 @@ describe('App', () => {
     fireEvent.submit(dialog);
     await flush();
     expect(stopped).toEqual([['tests-session', '方針が変わった']]);
+  });
+
+  it('指揮役を起こせなければ理由を出し、もう一度頼める', async () => {
+    const { bridge, ensured } = makeBridge({
+      ...missingSnapshot,
+      leaderStartup: { kind: 'failed', message: 'Claude Code v2.1.200 は古いです' },
+    });
+    const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
+    await flush();
+    expect(container.textContent).toContain('指揮役を起こせませんでした');
+    expect(container.textContent).toContain('Claude Code v2.1.200 は古いです');
+    fireEvent.click(getByText('もう一度'));
+    expect(ensured()).toBe(1);
+  });
+
+  it('指揮役を起こしたときの警告を上端に出す', async () => {
+    const { bridge } = makeBridge({
+      ...leaderSnapshot,
+      leaderStartup: { kind: 'ready', action: 'started', warnings: ['スキルが別の内容です'] },
+    });
+    const { container } = render(<App environment={environment} bridge={bridge} />);
+    await flush();
+    expect(container.querySelector('.top-bar__notices')?.textContent).toContain('スキルが別の内容です');
   });
 
   it('承認のボタンは置かない', async () => {
