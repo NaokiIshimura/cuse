@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    cuse のアプリアイコン（原画）。指揮棒を振る Clawd。
+    Clawd は画面の AA（src/shared/characters.ts の「左手を上げた」形）を、そのまま点に直したもの
+    （端末の文字のセルは縦長なので、点は 1:2 の縦長にする）。音符の色は AA の色（--ink-*）。
+    書き換えたら npm run icon で assets/icon.icns と assets/icon.png を作り直す。
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22262d"/>
+      <stop offset="1" stop-color="#0e1014"/>
+    </linearGradient>
+  </defs>
+  <!-- macOS のアイコンの余白（824 四方の角丸） -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#3a3f48" stroke-width="3"/>
+
+  <!-- 絵は左右の余白がそろうよう少し左へ -->
+  <g transform="translate(-30 0)">
+  <!-- 音符 -->
+  <g fill="#4cc9f0"><rect x="250" y="369" width="66" height="44"/><rect x="261" y="358" width="44" height="66"/><rect x="294" y="215" width="22" height="165"/><rect x="316" y="237" width="22" height="22"/><rect x="338" y="259" width="22" height="55"/></g>
+  <g fill="#f5b544"><rect x="430" y="296" width="54" height="36"/><rect x="439" y="287" width="36" height="54"/><rect x="466" y="170" width="18" height="135"/><rect x="484" y="188" width="18" height="18"/><rect x="502" y="206" width="18" height="45"/></g>
+
+  <!-- 指揮棒（上げた左手から） -->
+  <g fill="#f2f3f5"><rect x="772" y="482" width="20" height="28"/><rect x="786" y="454" width="20" height="28"/><rect x="800" y="426" width="20" height="28"/><rect x="814" y="398" width="20" height="28"/><rect x="828" y="370" width="20" height="28"/><rect x="842" y="342" width="20" height="28"/><rect x="856" y="314" width="20" height="28"/><rect x="870" y="286" width="20" height="28"/></g>
+
+  <!-- Clawd -->
+  <g fill="#d97757">
+    <rect x="262" y="440" width="34" height="68"/>
+    <rect x="262" y="508" width="34" height="68"/>
+    <rect x="296" y="440" width="34" height="68"/>
+    <rect x="330" y="440" width="34" height="68"/>
+    <rect x="296" y="508" width="34" height="68"/>
+    <rect x="364" y="440" width="34" height="68"/>
+    <rect x="398" y="440" width="34" height="68"/>
+    <rect x="364" y="508" width="34" height="68"/>
+    <rect x="398" y="508" width="34" height="68"/>
+    <rect x="432" y="440" width="34" height="68"/>
+    <rect x="466" y="440" width="34" height="68"/>
+    <rect x="432" y="508" width="34" height="68"/>
+    <rect x="466" y="508" width="34" height="68"/>
+    <rect x="500" y="440" width="34" height="68"/>
+    <rect x="534" y="440" width="34" height="68"/>
+    <rect x="500" y="508" width="34" height="68"/>
+    <rect x="534" y="508" width="34" height="68"/>
+    <rect x="568" y="440" width="34" height="68"/>
+    <rect x="602" y="440" width="34" height="68"/>
+    <rect x="568" y="508" width="34" height="68"/>
+    <rect x="636" y="440" width="34" height="68"/>
+    <rect x="670" y="440" width="34" height="68"/>
+    <rect x="636" y="508" width="34" height="68"/>
+    <rect x="670" y="508" width="34" height="68"/>
+    <rect x="738" y="508" width="34" height="68"/>
+    <rect x="194" y="576" width="34" height="68"/>
+    <rect x="228" y="576" width="34" height="68"/>
+    <rect x="262" y="576" width="34" height="68"/>
+    <rect x="262" y="644" width="34" height="68"/>
+    <rect x="296" y="576" width="34" height="68"/>
+    <rect x="330" y="576" width="34" height="68"/>
+    <rect x="296" y="644" width="34" height="68"/>
+    <rect x="330" y="644" width="34" height="68"/>
+    <rect x="364" y="576" width="34" height="68"/>
+    <rect x="398" y="576" width="34" height="68"/>
+    <rect x="364" y="644" width="34" height="68"/>
+    <rect x="398" y="644" width="34" height="68"/>
+    <rect x="432" y="576" width="34" height="68"/>
+    <rect x="466" y="576" width="34" height="68"/>
+    <rect x="432" y="644" width="34" height="68"/>
+    <rect x="466" y="644" width="34" height="68"/>
+    <rect x="500" y="576" width="34" height="68"/>
+    <rect x="534" y="576" width="34" height="68"/>
+    <rect x="500" y="644" width="34" height="68"/>
+    <rect x="534" y="644" width="34" height="68"/>
+    <rect x="568" y="576" width="34" height="68"/>
+    <rect x="602" y="576" width="34" height="68"/>
+    <rect x="568" y="644" width="34" height="68"/>
+    <rect x="602" y="644" width="34" height="68"/>
+    <rect x="636" y="576" width="34" height="68"/>
+    <rect x="670" y="576" width="34" height="68"/>
+    <rect x="636" y="644" width="34" height="68"/>
+    <rect x="670" y="644" width="34" height="68"/>
+    <rect x="704" y="576" width="34" height="68"/>
+    <rect x="738" y="576" width="34" height="68"/>
+    <rect x="330" y="712" width="34" height="68"/>
+    <rect x="398" y="712" width="34" height="68"/>
+    <rect x="534" y="712" width="34" height="68"/>
+    <rect x="602" y="712" width="34" height="68"/>
+  </g>
+  </g>
+</svg>

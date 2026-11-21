@@ -170,6 +170,10 @@ describe('App', () => {
     await flush();
     expect(opened).toEqual([{ tabId: 'leader', sessionId: 'leader-session', cols: 80, rows: 24 }]);
     expect(container.querySelector('.badge')?.textContent).toBe('指揮役');
+    // 指揮役の Clawd は指揮棒を持つ（右端の桁を白くする）
+    expect(
+      [...container.querySelectorAll('.character--leader .character__baton')].map((cell) => cell.textContent),
+    ).toEqual([' ', '▚', ' ']);
   });
 
   it('左で配下を開くとタブが増え、閉じると attach を切る', async () => {
