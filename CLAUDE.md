@@ -66,7 +66,7 @@ README のインストール手順は `releases/latest/download/` のバージ�
 | `src/config/defaults.ts` | 未決事項の仮の値（上限など）。決まっていない値はここに集める |
 | `schema/` | 台帳 `~/.cuse/ledger.json` の JSON Schema（他のツール向けに公開） |
 | `prompts/` | 指揮役・配下の心得（`--append-system-prompt` で渡す）。npm パッケージに同梱する |
-| `skill/cuse/SKILL.md` | cuse スキル（指揮役向けのコマンドの使い方）。`start` / `install-skill` が `~/.claude/skills/cuse/` に置く |
+| `skill/cuse/SKILL.md` | cuse スキル（指揮役向けのコマンドの使い方）。指揮役を起こすたびに `~/.claude/skills/cuse/` に置く。`cuse-managed` の印がある（または前の版の cuse の説明文で始まる）ものは cuse のものとして最新に書き直し、人が書いたものは上書きしない。印は消さないこと |
 | `test/fixtures/` | `claude agents --json` と transcript の見本 |
 | `test/support/fakeClaude.ts` | 本物の `claude` の代わりに使う偽物（`--bg` / `--resume` / `stop` / `agents` / `git rev-parse` に答え、呼ばれ方を記録する） |
 

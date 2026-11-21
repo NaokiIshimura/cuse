@@ -170,7 +170,19 @@ describe('runStart', () => {
     w.files.set(skillPath('/Users/example'), '自分で書いた内容');
     const outcome = await runStart({}, w.deps);
     expect(outcome.ok).toBe(true);
-    expect(outcome.warnings[0]).toContain('--force');
+    expect(outcome.warnings[0]).toContain('自分で書いた cuse スキルがある');
     expect(w.files.get(skillPath('/Users/example'))).toBe('自分で書いた内容');
+  });
+
+  it('前の版の cuse が置いたスキルは、警告を出さずに最新へ書き直す', async () => {
+    const w = createFakeWorld();
+    w.files.set(
+      skillPath('/Users/example'),
+      '---\nname: cuse\ndescription: cuse の指揮役として、このマシンのほかの Claude Code セッション（配下）を起動・見守り・指示・停止するときに使う。cuse start で起動した指揮役（cuse-leader）専用。\n---\n古い説明\n',
+    );
+    const outcome = await runStart({}, w.deps);
+    expect(outcome.ok && outcome.value.skill.status).toBe('updated');
+    expect(outcome.warnings).toEqual([]);
+    expect(w.files.get(skillPath('/Users/example'))).toContain('cuse-managed');
   });
 });
