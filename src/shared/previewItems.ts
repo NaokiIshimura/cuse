@@ -4,7 +4,11 @@
  * 右のプレビューは「セッションに出てきたもの」だけを開く（それ以外のファイルや URL は開かない）。
  * 拾うのは次の 2 つ:
  * - ツールの呼び出し: Read / Edit / MultiEdit / Write / NotebookEdit の `file_path`（`notebook_path`）と、WebFetch の `url`
- * - 会話に出た localhost などの URL（開発中のサイトを確かめるため）
+ * - 会話（人の依頼と Claude の返事の本文）に出た http(s) の URL
+ * - ツールの結果に出た localhost などの URL（開発サーバを起こしたときの出力など）
+ *
+ * ツールの結果（読んだファイルや取ってきたページの中身）に出た外の URL は拾わない。数が多すぎるうえ、
+ * 人が見ていない文書が並べた URL まで候補に混ざるため。開くのは人が押したときだけで、Web 表示は main が隔離する。
  *
  * `node:*` に依存させず、main でも renderer でも使えるようにする。
  */
@@ -35,11 +39,17 @@ export const previewKey = (item: PreviewItem): string =>
 const READ_TOOLS: ReadonlySet<string> = new Set(['Read']);
 const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
 
-/** 会話に出てきた、手元で動いているサイトの URL。外のサイトは WebFetch したものだけを拾う。 */
+/** 手元で動いているサイトの URL。ツールの結果からも拾う。 */
 const LOCAL_URL = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d{1,5})?(?:\/[^\s"'`<>)\]]*)?/g;
 
-/** 末尾についた句読点を外す。 */
-const trimUrl = (url: string): string => url.replace(/[.,;:!?。、）]+$/u, '');
+/**
+ * 会話の本文に出た URL。日本語の文に続けて書かれても切れるよう、ASCII 以外の文字で止める
+ * （`https://example.comを開いて` → `https://example.com`）。Markdown のリンク `[名前](URL)` の閉じかっこでも止める。
+ */
+const ANY_URL = /https?:\/\/[^\s"'`<>()[\]{}\u0080-\uffff]+/g;
+
+/** 末尾についた句読点と、Markdown の強調（`**URL**`）を外す。 */
+const trimUrl = (url: string): string => url.replace(/[.,;:!?。、）*_]+$/u, '');
 
 const isHttpUrl = (value: string): boolean => /^https?:\/\//i.test(value);
 
@@ -59,8 +69,8 @@ const toEpochMs = (value: unknown): number => {
   return Number.isNaN(ms) ? 0 : ms;
 };
 
-/** 文字列の本文（text ブロックか、tool_result の中身）を集める。 */
-const textsOf = (content: unknown): string[] => {
+/** 文字列の本文（text ブロック。`withToolResults` なら tool_result の中身も）を集める。 */
+const textsOf = (content: unknown, withToolResults: boolean): string[] => {
   if (typeof content === 'string') {
     return [content];
   }
@@ -74,8 +84,8 @@ const textsOf = (content: unknown): string[] => {
     if (block.type === 'text' && typeof block.text === 'string') {
       return [block.text];
     }
-    if (block.type === 'tool_result') {
-      return textsOf(block.content);
+    if (block.type === 'tool_result' && withToolResults) {
+      return textsOf(block.content, true);
     }
     return [];
   });
@@ -131,9 +141,18 @@ export const extractPreviewItems = (chunk: string, limit = 50): PreviewItem[] =>
     }
 
     if (entry.type === 'assistant' || entry.type === 'user') {
-      for (const text of textsOf(content)) {
+      for (const text of textsOf(content, true)) {
         for (const match of text.matchAll(LOCAL_URL)) {
           put({ kind: 'url', url: trimUrl(match[0]), at, tool: 'mention' });
+        }
+      }
+      for (const text of textsOf(content, false)) {
+        for (const match of text.matchAll(ANY_URL)) {
+          const url = trimUrl(match[0]);
+          // `https://` だけのような、ホストの無いものは拾わない
+          if (/^https?:\/\/[^/?#]+/i.test(url)) {
+            put({ kind: 'url', url, at, tool: 'mention' });
+          }
         }
       }
     }
