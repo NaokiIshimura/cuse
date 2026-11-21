@@ -8,6 +8,7 @@ import {
   LEADER_WIDTH,
   getFrame,
   getLeaderFrame,
+  isBatonRow,
 } from './characters.js';
 
 /*
@@ -88,17 +89,24 @@ describe('getLeaderFrame', () => {
     }
   });
 
-  it.each(STATES)('%s は指揮棒を 1 本だけ持ち、手や腕から離れていない', (state) => {
+  it.each(STATES)('%s は指揮棒を 1 本だけ持ち、その行だけを白く描く。手や腕から離れていない', (state) => {
+    for (const frame of framesOf(state)) {
+      expect(frame.split('\n').filter(isBatonRow)).toHaveLength(1);
+    }
+  });
+
+  it.each(STATES)('%s は手や腕から離れていない', (state) => {
     for (const frame of framesOf(state)) {
       expect(batonOf(frame).filter((cell) => cell !== ' ')).toHaveLength(1);
       expect(isSingleShape(toPixels(frame))).toBe(true);
     }
   });
 
-  it('ふだんは右手で指揮棒を左上へ上げ、作業中は左下へ振り下ろす', () => {
-    expect(batonOf(getLeaderFrame('waiting', 0))).toEqual(['▚', ' ', ' ']);
-    expect(batonOf(getLeaderFrame('working', 0))).toEqual(['▚', ' ', ' ']);
-    expect(batonOf(getLeaderFrame('working', 1))).toEqual([' ', '▞', ' ']);
+  it('ふだんは右手で指揮棒を左上へ上げ、作業中は左下へ振り下ろす（棒を握る手は棒の根元と同じ桁）', () => {
+    const leftTwo = (frame: string) => frame.split('\n').map((row) => [...row].slice(0, 2).join(''));
+    expect(leftTwo(getLeaderFrame('waiting', 0))).toEqual(['▝▄', ' ▀', '  ']);
+    expect(leftTwo(getLeaderFrame('working', 0))).toEqual(['▝▄', ' ▀', '  ']);
+    expect(leftTwo(getLeaderFrame('working', 1))).toEqual(['  ', '▗▀', '  ']);
     expect(getLeaderFrame('working', 2)).toBe(getLeaderFrame('working', 0));
   });
 
