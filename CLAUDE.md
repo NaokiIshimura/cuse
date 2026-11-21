@@ -12,7 +12,8 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 何をどう作るかは `docs/HANDOFF.md`、設計の理由は `docs/cuse 企画書（単体ツール版）.md` にある。
 
 いまは **第 3 段階（v0.3、回収と片付け）**。第 2 段階までに加えて `review` / `clean`、承認待ちの OS 通知、右のプレビューまで入った。
-第 4 段階（MCP サーバー版など）は、Naoki が第 3 段階を確かめてから始める。
+第 4 段階のうち、MCP サーバー版とプラグインとしての配布は「要らない」と決めた（cuse.app の中で完結させる。指揮役は
+内部の `~/.cuse/bin/cuse` を使う）。共通コードは切り出さず、cc-park から写すやり方を続ける（`docs/共通コードの判断.md`）。
 
 `clean` は `src/core/gitStatus.ts` の `isSafeToClean` が true のものだけを `claude rm` する。分からないこと
 （リモートが無くて push したか確かめられない、など）は「残す」側に倒す。配下が作業した場所は、`claude agents` の `cwd`
@@ -37,6 +38,7 @@ npm test            # 全テスト
 npx vitest run <ファイルパス>   # テストは対象を指定して実行する
 npm run gui:dev     # ビルドしてウィンドウを起動（cuse app と同じ）
 npm run gui:package # .app にパッケージ化（macOS。ad-hoc 署名まで行う）
+npm run copies:check -- <cc-park のディレクトリ>  # cc-park から写したファイルと写し元のずれ
 ```
 
 ## リリース
@@ -75,9 +77,14 @@ README のインストール手順は `releases/latest/download/` のバージ�
 
 ### cc-park から写したコード
 
-`src/types/agent.ts`、`src/core/` と `src/shared/` の多く、`src/hooks/`、renderer の `Character` / `StatusBadge` / `colors.ts` は
+`src/types/agent.ts`、`src/core/` と `src/shared/` の多く、`src/hooks/`、renderer の `Character` / `colors.ts` は
 cc-park v0.25.0 から写した。ファイルの先頭に「写し元: cc-park `<パス>` @ `<コミット>`」がある。
 写したファイルを直すときは、先頭の行を残したまま直し、cc-park 側にも要る修正かを PR に書く。
+共通パッケージにはしない（`docs/共通コードの判断.md`）。写し元とのずれは次で確かめる:
+
+```bash
+npm run copies:check -- <cc-park を clone したディレクトリ>
+```
 
 `claude agents --json` の出力仕様は非公開で変わりうる。実際に見た出力は匿名化して
 `test/fixtures/agents/` に置き、`src/core/fixtures.test.ts` で正規化できることを固定している。
