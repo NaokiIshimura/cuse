@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,7 @@ import {
 import { createLeaderStartup, startWhenTrusted } from './leaderStartup.js';
 import { readFolderTrusted } from '../core/claudeTrust.js';
 import { execFileRunner } from '../core/runCommand.js';
+import { ensureSpawnHelperExecutable } from '../core/ptyHelper.js';
 import { createTerminalManager } from './terminals.js';
 
 /**
@@ -175,6 +177,38 @@ const terminals = createTerminalManager({
   },
 });
 
+/**
+ * 端末を起こす前に、node-pty の spawn-helper に実行権限があるか確かめる（1 回だけ）。
+ * npm で入れた node-pty は実行権限が落ちていることがあり、そのままだと端末が真っ暗になる。
+ */
+let ptyReady: Promise<string | null> | null = null;
+const preparePty = (): Promise<string | null> => {
+  ptyReady ??= ensureSpawnHelperExecutable(
+    dirname(createRequire(import.meta.url).resolve('node-pty/package.json')),
+    { platform: process.platform, arch: process.arch },
+  ).then(
+    (result) => (result.ok ? null : result.message),
+    (error: unknown) => `端末の準備に失敗しました: ${String(error)}`,
+  );
+  return ptyReady;
+};
+
+/** 端末を開く。失敗（node-pty が起きないなど）は理由にして返し、画面に出す。 */
+const openTerminalSafely = async (
+  open: () => void,
+): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> => {
+  const problem = await preparePty();
+  if (problem !== null) {
+    return { ok: false, message: problem };
+  }
+  try {
+    open();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: `端末を起こせませんでした: ${String(error)}` };
+  }
+};
+
 ipcMain.handle(
   IPC_CHANNELS.openTerminal,
   async (event, request: OpenTerminalRequest): Promise<OpenTerminalResult> => {
@@ -192,8 +226,12 @@ ipcMain.handle(
       return target;
     }
     terminalTarget = event.sender;
-    terminals.open(request.tabId, { kind: 'attach', shortId: target.shortId }, request.cols, request.rows);
-    return { ok: true, name: target.name, shortId: target.shortId, role: target.role };
+    const opened = await openTerminalSafely(() => {
+      terminals.open(request.tabId, { kind: 'attach', shortId: target.shortId }, request.cols, request.rows);
+    });
+    return opened.ok
+      ? { ok: true, name: target.name, shortId: target.shortId, role: target.role }
+      : opened;
   },
 );
 
@@ -205,14 +243,16 @@ ipcMain.handle(
  */
 ipcMain.handle(
   IPC_CHANNELS.openTrustTerminal,
-  (event, request: OpenTrustTerminalRequest) => {
+  async (event, request: OpenTrustTerminalRequest) => {
     const status = leaderStartup.status();
     if (status.kind !== 'failed' || status.untrustedFolder === null || typeof request?.tabId !== 'string') {
       return { ok: false as const, message: '信頼してもらうフォルダがありません。' };
     }
+    const folder = status.untrustedFolder;
     terminalTarget = event.sender;
-    terminals.open(request.tabId, { kind: 'trust', folder: status.untrustedFolder }, request.cols, request.rows);
-    return { ok: true as const };
+    return openTerminalSafely(() => {
+      terminals.open(request.tabId, { kind: 'trust', folder }, request.cols, request.rows);
+    });
   },
 );
 
