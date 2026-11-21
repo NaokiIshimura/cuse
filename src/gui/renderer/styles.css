@@ -933,6 +933,215 @@ button {
   user-select: none;
 }
 
+/* 見せ方の切り替え（差分 / 整えて見る / 元の文字） */
+.preview__modes {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.link-button--on {
+  background: var(--surface-raised);
+  color: var(--fg);
+  border-color: var(--fg-faint);
+}
+
+/* コードの色。highlight.js のクラス名に、AA と同じ色を当てる */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag {
+  color: var(--ink-magenta);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: var(--ink-green);
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--ink-yellow);
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--ink-blue-bright);
+}
+
+.hljs-built_in,
+.hljs-type,
+.hljs-class,
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-name {
+  color: var(--ink-cyan);
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params {
+  color: var(--ink-default);
+}
+
+.hljs-deletion {
+  color: var(--ink-red);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}
+
+/* Markdown を整えた表示 */
+.preview-md {
+  padding: 12px 16px 24px;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.preview-md h1,
+.preview-md h2,
+.preview-md h3,
+.preview-md h4 {
+  margin: 1.2em 0 0.5em;
+  line-height: 1.35;
+}
+
+.preview-md h1 {
+  font-size: 20px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-md h2 {
+  font-size: 17px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-md h3 {
+  font-size: 15px;
+}
+
+.preview-md h4 {
+  font-size: 13px;
+}
+
+.preview-md > :first-child {
+  margin-top: 0;
+}
+
+.preview-md p,
+.preview-md ul,
+.preview-md ol,
+.preview-md blockquote,
+.preview-md table {
+  margin: 0 0 0.9em;
+}
+
+.preview-md ul,
+.preview-md ol {
+  padding-left: 1.6em;
+}
+
+.preview-md li > ul,
+.preview-md li > ol {
+  margin: 0.2em 0;
+}
+
+.preview-md blockquote {
+  padding: 0 0 0 12px;
+  border-left: 3px solid var(--fg-faint);
+  color: var(--fg-muted);
+}
+
+.preview-md hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.2em 0;
+}
+
+.preview-md table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+.preview-md th,
+.preview-md td {
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+}
+
+.preview-md th {
+  background: var(--surface-raised);
+}
+
+.preview-md code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+}
+
+.preview-md__code {
+  position: relative;
+  margin: 0 0 0.9em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  overflow-x: auto;
+}
+
+.preview-md__code .preview-text__line {
+  padding: 0 12px;
+}
+
+.preview-md__fence {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  color: var(--fg-faint);
+  font-size: 10px;
+}
+
+.preview-md__link {
+  color: var(--ink-cyan);
+  text-decoration: underline dotted;
+  cursor: help;
+}
+
+.preview-md__image {
+  color: var(--fg-muted);
+}
+
+.preview-md input[type='checkbox'] {
+  margin: 0 6px 0 0;
+}
+
+.preview-md li:has(> input[type='checkbox']) {
+  list-style: none;
+  margin-left: -1.2em;
+}
+
 .preview-diff {
   padding: 0 10px;
   white-space: pre;

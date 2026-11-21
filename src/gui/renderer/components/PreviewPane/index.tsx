@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { previewKey, type PreviewItem } from '../../../../shared/previewItems.js';
 import type { CuseBridge, PreviewResult } from '../../../ipc.js';
+import { CodeView } from './CodeView.js';
+import { languageOf } from './highlight.js';
+import { MarkdownView } from './MarkdownView.js';
 
 /** プレビューの一覧を取り直す間隔。 */
 const POLL_MS = 2000;
@@ -25,18 +28,11 @@ const itemTitle = (item: PreviewItem): string =>
 const itemTool = (item: PreviewItem): string =>
   item.kind === 'url' ? (item.tool === 'WebFetch' ? 'WebFetch' : '会話') : item.tool;
 
-/** 行番号つきで文字を見せる。 */
-const NumberedText = ({ text }: { readonly text: string }) => (
-  <pre className="preview-text">
-    {text.split('\n').map((line, index) => (
-      // 行の中身は変わりうるので、行番号を鍵にする
-      <div className="preview-text__line" key={index}>
-        <span className="preview-text__number">{index + 1}</span>
-        <span>{line}</span>
-      </div>
-    ))}
-  </pre>
-);
+/** 整えて見せられるファイルか（Markdown）。 */
+const isMarkdown = (path: string): boolean => /\.(md|markdown)$/i.test(path);
+
+/** 文字のファイルの見せ方。差分・整えた表示（Markdown）・元の文字。 */
+type TextMode = 'diff' | 'rendered' | 'source';
 
 /** git diff を色分けして見せる。 */
 const DiffText = ({ diff }: { readonly diff: string }) => (
@@ -70,7 +66,10 @@ const PreviewBody = ({
   readonly onReveal: () => void;
   readonly onOpenExternal: (url: string) => void;
 }) => {
-  const [showWhole, setShowWhole] = useState(false);
+  const path = item.kind === 'file' ? item.path : '';
+  const markdown = isMarkdown(path);
+  // 書き換えたファイルはまず差分、Markdown はまず整えた表示を見せる
+  const [chosen, setChosen] = useState<TextMode | null>(null);
   if (result === null) {
     return <p className="preview__message">読み込んでいます…</p>;
   }
@@ -106,23 +105,44 @@ const PreviewBody = ({
       return <p className="preview__message">{result.message}</p>;
     case 'text': {
       const diff = result.diff;
+      const modes: TextMode[] = [
+        ...(diff === null ? [] : (['diff'] as const)),
+        ...(markdown ? (['rendered'] as const) : []),
+        'source',
+      ];
+      const mode = chosen !== null && modes.includes(chosen) ? chosen : (modes[0] ?? 'source');
+      const label: Record<TextMode, string> = { diff: '差分', rendered: '整えて見る', source: '元の文字' };
       return (
         <div className="preview-file">
           <div className="preview__toolbar">
-            <span className="preview__path">{item.kind === 'file' ? item.path : ''}</span>
-            {diff === null ? null : (
-              <button
-                type="button"
-                className="link-button link-button--small"
-                onClick={() => {
-                  setShowWhole((current) => !current);
-                }}
-              >
-                {showWhole ? '差分を見る' : '全体を見る'}
-              </button>
+            <span className="preview__path">{path}</span>
+            {modes.length < 2 ? null : (
+              <span className="preview__modes" role="group" aria-label="見せ方">
+                {modes.map((candidate) => (
+                  <button
+                    type="button"
+                    key={candidate}
+                    aria-pressed={candidate === mode}
+                    className={
+                      candidate === mode ? 'link-button link-button--small link-button--on' : 'link-button link-button--small'
+                    }
+                    onClick={() => {
+                      setChosen(candidate);
+                    }}
+                  >
+                    {label[candidate]}
+                  </button>
+                ))}
+              </span>
             )}
           </div>
-          {diff !== null && !showWhole ? <DiffText diff={diff} /> : <NumberedText text={result.text} />}
+          {mode === 'diff' && diff !== null ? (
+            <DiffText diff={diff} />
+          ) : mode === 'rendered' ? (
+            <MarkdownView text={result.text} />
+          ) : (
+            <CodeView text={result.text} language={languageOf(path)} />
+          )}
           {result.truncated ? <p className="preview__message">大きなファイルなので、先頭だけを出しています。</p> : null}
         </div>
       );
