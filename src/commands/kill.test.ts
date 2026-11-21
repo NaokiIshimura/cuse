@@ -62,4 +62,16 @@ describe('runKill', () => {
     const other = await runKill({ name: 'hand', reason: 'x', byHuman: true }, w.deps);
     expect(other.ok).toBe(false);
   });
+
+  it('ウィンドウから止めるときは sessionId の完全一致だけで決める（前方一致で別の配下を止めない）', async () => {
+    const w = world({});
+    const partial = await runKill({ name: 'tests', sessionId: 'tests', reason: 'x', byHuman: true }, w.deps);
+    expect(!partial.ok && partial.error.kind).toBe('not-found');
+    const other = await runKill({ name: 'hand-session', sessionId: 'hand-session', reason: 'x', byHuman: true }, w.deps);
+    expect(!other.ok && other.error.kind).toBe('not-found');
+    expect(stopCalls(w)).toEqual([]);
+    const exact = await runKill({ name: 'tests-session', sessionId: 'tests-session', reason: 'x', byHuman: true }, w.deps);
+    expect(exact.ok).toBe(true);
+    expect(stopCalls(w)).toEqual([['stop', 'tid']]);
+  });
 });

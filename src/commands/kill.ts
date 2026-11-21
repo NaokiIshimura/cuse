@@ -1,4 +1,5 @@
 import { stopSession } from '../core/claudeBg.js';
+import type { LedgerWorker } from '../core/ledger.js';
 import { checkLeader } from '../core/leaderToken.js';
 import { resolveWorker } from '../shared/resolveAgent.js';
 import { listAgents, loadLedger, saveLedger, type OpsDeps } from './deps.js';
@@ -19,6 +20,11 @@ export interface KillInput {
    * （人の操作は指揮役でなくても使える。ただし台帳の配下に限るのは同じ）。
    */
   readonly byHuman?: boolean;
+  /**
+   * 止める配下の sessionId（GUI から）。指定したときは名前で探さず、台帳の sessionId との完全一致だけで決める
+   * （安全の約束 3。前方一致や部分一致で別の配下を止めないように）。
+   */
+  readonly sessionId?: string;
 }
 
 export interface KillResult {
@@ -42,6 +48,13 @@ export const runKill = async (input: KillInput, deps: OpsDeps): Promise<Outcome<
       return failure({ kind: 'denied', message: leader.message });
     }
   }
+  if (input.sessionId !== undefined) {
+    const exact = loaded.ledger?.workers.find((w) => w.sessionId === input.sessionId);
+    if (exact === undefined) {
+      return failure({ kind: 'not-found', message: '台帳に載った配下ではないので止められません。' });
+    }
+    return stopWorker(exact, input.reason.trim(), deps);
+  }
   const resolved = resolveWorker(loaded.ledger?.workers ?? [], input.name);
   if (!resolved.ok) {
     return failure(
@@ -50,8 +63,10 @@ export const runKill = async (input: KillInput, deps: OpsDeps): Promise<Outcome<
         : { kind: 'not-found', message: resolved.message },
     );
   }
-  const worker = resolved.item;
+  return stopWorker(resolved.item, input.reason.trim(), deps);
+};
 
+const stopWorker = async (worker: LedgerWorker, reason: string, deps: OpsDeps): Promise<Outcome<KillResult>> => {
   // 台帳に短縮 ID が無ければ、一覧から引く
   let shortId = worker.shortId;
   if (shortId === null) {
@@ -71,7 +86,6 @@ export const runKill = async (input: KillInput, deps: OpsDeps): Promise<Outcome<
   }
 
   const endedAt = new Date(deps.now()).toISOString();
-  const reason = input.reason.trim();
   const saved = await saveLedger(deps, (current) => ({
     ...current,
     workers: current.workers.map((w) =>

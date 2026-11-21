@@ -75,10 +75,17 @@ export const runClean = async (
       continue;
     }
 
-    const { workDir } = await readWorkDir(worker.sessionId, agent?.cwd ?? worker.cwd, deps);
-    const reason = keepReason(await readGitStatus(workDir, { runner: deps.runner }));
+    const { workDir, workDirKnown } = await readWorkDir(worker.sessionId, agent?.cwd ?? worker.cwd, deps);
+    const git = await readGitStatus(workDir, { runner: deps.runner });
+    const reason = keepReason(git);
     if (reason !== null) {
       kept.push({ name: worker.name, reason });
+      continue;
+    }
+    // transcript が読めないと、配下が移った worktree が分からない（起動した場所だけ見て消すと、
+    // worktree の未 commit の変更を見落とす）。claude rm するもの（一覧にあるセッション）は残す
+    if (agent !== undefined && git.repository && !workDirKnown) {
+      kept.push({ name: worker.name, reason: '作業した場所（worktree）を transcript から確かめられない' });
       continue;
     }
 

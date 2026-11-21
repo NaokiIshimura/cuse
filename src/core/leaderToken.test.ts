@@ -59,4 +59,8 @@ describe('withoutLeaderToken', () => {
       PATH: '/bin',
     });
   });
+
+  it('cuse コマンドを動かすための ELECTRON_RUN_AS_NODE も配下へ渡さない', () => {
+    expect(withoutLeaderToken({ ELECTRON_RUN_AS_NODE: '1', PATH: '/bin' })).toEqual({ PATH: '/bin' });
+  });
 });

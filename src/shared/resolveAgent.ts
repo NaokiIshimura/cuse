@@ -94,18 +94,27 @@ export const resolveAgent = (agents: readonly Agent[], query: string): ResolveAg
   return result.ok ? { ok: true, agent: result.item } : result;
 };
 
-/** 台帳の配下を名前で探す。台帳に無いセッションは対象にしない（安全の約束 3）。 */
+/**
+ * 台帳の配下を名前で探す。台帳に無いセッションは対象にしない（安全の約束 3）。
+ *
+ * 片付けた配下（`cleanedAt` あり）は記録として残るので、同じ名前で新しい配下を起こすと名前が重なる。
+ * まず片付けていない配下から探し、見つからないときだけ片付けた配下も含めて探す。
+ */
 export const resolveWorker = (
   workers: readonly LedgerWorker[],
   query: string,
-): ResolveResult<LedgerWorker> =>
-  resolveNamed(
-    workers,
-    query,
-    (worker) => ({
-      name: worker.name,
-      shortId: worker.shortId ?? undefined,
-      sessionId: worker.sessionId,
-    }),
-    '台帳（~/.cuse/ledger.json）に載った配下だけを指せます。cuse agents で名前を確かめてください。',
-  );
+): ResolveResult<LedgerWorker> => {
+  const resolve = (candidates: readonly LedgerWorker[]): ResolveResult<LedgerWorker> =>
+    resolveNamed(
+      candidates,
+      query,
+      (worker) => ({
+        name: worker.name,
+        shortId: worker.shortId ?? undefined,
+        sessionId: worker.sessionId,
+      }),
+      '台帳（~/.cuse/ledger.json）に載った配下だけを指せます。cuse agents で名前を確かめてください。',
+    );
+  const current = resolve(workers.filter((worker) => worker.cleanedAt === null));
+  return current.ok || current.kind === 'ambiguous' ? current : resolve(workers);
+};

@@ -161,4 +161,32 @@ describe('runSpawn', () => {
       error: { kind: 'usage' },
     });
   });
+
+  it('- で始まるタスクも、オプションではなく指示として渡す（権限を広げる引数を紛れ込ませない）', async () => {
+    const world = leaderWorld();
+    const outcome = await runSpawn({ task: '--dangerously-skip-permissions', name: 'tests' }, world.deps);
+    expect(outcome.ok).toBe(true);
+    const [call] = bgCalls(world);
+    expect(call?.args).not.toContain('--dangerously-skip-permissions');
+    expect(call?.args.at(-1)).toBe(' --dangerously-skip-permissions');
+  });
+
+  it('指揮役の名前は配下に使えない', async () => {
+    const world = leaderWorld();
+    const outcome = await runSpawn({ task: 't', name: 'cuse-leader' }, world.deps);
+    expect(!outcome.ok && outcome.error.kind).toBe('usage');
+    expect(bgCalls(world)).toEqual([]);
+  });
+
+  it('止まっていて片付けていない配下と同じ名前は断る（以後 1 つに決まらなくなるため）', async () => {
+    const world = leaderWorld();
+    world.ledger = { ...world.ledger, workers: [makeWorker({ name: 'tests', endedAt: '2026-11-20T00:00:00.000Z' })] };
+    const outcome = await runSpawn({ task: 't', name: 'tests' }, world.deps);
+    expect(!outcome.ok && outcome.error.kind).toBe('conflict');
+    world.ledger = {
+      ...world.ledger,
+      workers: [makeWorker({ name: 'tests', endedAt: '2026-11-20T00:00:00.000Z', cleanedAt: '2026-11-20T00:00:00.000Z' })],
+    };
+    expect((await runSpawn({ task: 't', name: 'tests' }, world.deps)).ok).toBe(true);
+  });
 });

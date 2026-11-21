@@ -1,5 +1,5 @@
 import { isAbsolute, resolve } from 'node:path';
-import { MAX_WORKERS } from '../config/defaults.js';
+import { LEADER_NAME, MAX_WORKERS } from '../config/defaults.js';
 import { findByShortId, isAlive, launchBackground } from '../core/claudeBg.js';
 import { activeLedgerWorkers, type Ledger, type LedgerWorker } from '../core/ledger.js';
 import { checkLeader, withoutLeaderToken } from '../core/leaderToken.js';
@@ -83,6 +83,13 @@ export const runSpawn = async (input: SpawnInput, deps: OpsDeps): Promise<Outcom
     });
   }
 
+  if (input.name === LEADER_NAME) {
+    return failure({
+      kind: 'usage',
+      message: `${LEADER_NAME} は指揮役の名前なので、配下には使えません（SendMessage の宛先が重なるため）。`,
+    });
+  }
+
   const loaded = await loadLedger(deps);
   if (!loaded.ok) {
     return loaded.outcome;
@@ -105,6 +112,13 @@ export const runSpawn = async (input: SpawnInput, deps: OpsDeps): Promise<Outcom
     return failure({
       kind: 'conflict',
       message: `${input.name} という配下はもう動いています。別の名前にするか、cuse prompt / SendMessage で指示してください。`,
+    });
+  }
+  // 止まっていても片付けていない配下と同じ名前にすると、以後その名前で 1 つに決まらなくなる
+  if ((ledger?.workers ?? []).some((worker) => worker.name === input.name && worker.cleanedAt === null)) {
+    return failure({
+      kind: 'conflict',
+      message: `${input.name} という配下が台帳に残っています（止まっていて、まだ片付けていません）。続きなら cuse prompt ${input.name} "<指示>"、新しく起こすなら別の名前にしてください。`,
     });
   }
   if (active.length >= MAX_WORKERS) {

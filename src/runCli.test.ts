@@ -236,6 +236,11 @@ describe('runCli（操作系）', () => {
     const world = leaderWorld();
     await runCli('spawn', ['テストを追加して', 'tests'], flags(), cliDeps(world));
     world.agents[0] = { ...world.agents[0], state: 'done', status: undefined, pid: undefined } as never;
+    // 作業した場所は transcript から読む（読めないと clean は残す）
+    world.transcripts.set(
+      world.ledger.workers[0]?.sessionId ?? '',
+      `${JSON.stringify({ type: 'user', cwd: world.ledger.workers[0]?.cwd, message: { role: 'user', content: 'x' } })}\n`,
+    );
     const reviewed = await runCli('review', ['tests'], flags({ json: true }), cliDeps(world));
     expect(parse(reviewed.stdout)).toMatchObject({ name: 'tests', keep: null });
     const cleaned = await runCli('clean', [], flags({ json: true }), cliDeps(world));

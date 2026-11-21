@@ -1,4 +1,4 @@
-import { open, stat } from 'node:fs/promises';
+import { open, realpath, stat } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
 import { imageMimeType, isSensitivePath } from '../shared/previewItems.js';
 import type { CommandRunner } from './runCommand.js';
@@ -68,7 +68,9 @@ export const readPreviewContent = async (
     return { kind: 'unavailable', message: `${item.path} は見つかりません（消されたか、移されたようです）。` };
   }
 
-  if (isSensitivePath(item.path) && !options.reveal) {
+  // 名前だけでなく、リンクの先も見る（`notes.txt` が `~/.ssh/id_rsa` を指していても伏せる）
+  const real = await realpath(item.path).catch(() => item.path);
+  if ((isSensitivePath(item.path) || isSensitivePath(real)) && !options.reveal) {
     return { kind: 'masked' };
   }
 

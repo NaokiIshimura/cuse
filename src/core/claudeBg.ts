@@ -84,9 +84,18 @@ export const buildBackgroundArgs = (launch: BackgroundLaunch): string[] => {
   if (launch.appendSystemPrompt !== undefined) {
     args.push('--append-system-prompt', launch.appendSystemPrompt);
   }
-  args.push(launch.prompt);
+  args.push(asPositional(launch.prompt));
   return args;
 };
+
+/**
+ * 指示を位置引数として渡せる形にする。
+ *
+ * `-` で始まる指示（`--dangerously-skip-permissions` など）は、claude にオプションとして読まれてしまい、
+ * 権限を広げる引数を指示に紛れ込ませられる（安全の約束 2）。先頭に空白を 1 つ足して、必ず指示として読ませる
+ * （`--` で区切る方法は、claude の引数の読み方に左右されるので使わない）。
+ */
+export const asPositional = (prompt: string): string => (prompt.startsWith('-') ? ` ${prompt}` : prompt);
 
 /**
  * `claude --bg` の出力から短縮 ID と名前を読む。
