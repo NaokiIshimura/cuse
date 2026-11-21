@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { failure, success, type Outcome } from '../commands/outcome.js';
 import type { StartResult } from '../commands/start.js';
-import { createLeaderStartup } from './leaderStartup.js';
+import { createLeaderStartup, startWhenTrusted } from './leaderStartup.js';
 
 const result = (action: StartResult['action']): StartResult => ({
   action,
@@ -76,5 +76,52 @@ describe('createLeaderStartup', () => {
     release();
     await Promise.all([first, second]);
     expect(calls).toBe(1);
+  });
+});
+
+describe('startWhenTrusted', () => {
+  const untrusted = (): Outcome<StartResult> =>
+    failure({ kind: 'untrusted', message: '信頼して', folder: '/Users/u/.cuse/leader' });
+
+  it('信頼したと読めたら、ボタンを押さなくても指揮役を起こす', async () => {
+    let calls = 0;
+    const startup = createLeaderStartup(async () => {
+      calls += 1;
+      return calls === 1 ? untrusted() : success(result('started'), 'ok');
+    });
+    await startup.ensure();
+    const asked: string[] = [];
+    expect(
+      await startWhenTrusted(startup, async (folder) => {
+        asked.push(folder);
+        return true;
+      }),
+    ).toBe(true);
+    expect(asked).toEqual(['/Users/u/.cuse/leader']);
+    expect(startup.status().kind).toBe('ready');
+  });
+
+  it('まだ信頼していなければ何もしない', async () => {
+    let calls = 0;
+    const startup = createLeaderStartup(async () => {
+      calls += 1;
+      return untrusted();
+    });
+    await startup.ensure();
+    expect(await startWhenTrusted(startup, async () => false)).toBe(false);
+    expect(calls).toBe(1);
+  });
+
+  it('信頼待ちでなければ読まない', async () => {
+    const startup = createLeaderStartup(async () => success(result('opened'), 'ok'));
+    await startup.ensure();
+    let asked = false;
+    expect(
+      await startWhenTrusted(startup, async () => {
+        asked = true;
+        return true;
+      }),
+    ).toBe(false);
+    expect(asked).toBe(false);
   });
 });

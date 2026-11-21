@@ -34,6 +34,7 @@ const environment: GuiEnvironment = {
   claudeVersion: { ok: true, version: '2.1.325' },
   maxWorkers: 3,
   platform: 'darwin',
+  cliInstalled: true,
 };
 
 const missingSnapshot: Snapshot = {
@@ -155,7 +156,8 @@ describe('App', () => {
       <App environment={environment} bridge={bridge} />,
     );
     await flush();
-    fireEvent.click(getAllByText('開く')[0] as HTMLElement);
+    // 承認待ちの配下は「開いて承認する」
+    fireEvent.click(getAllByText('開いて承認する')[0] as HTMLElement);
     await flush();
     expect(opened.map((request) => request.sessionId)).toContain('tests-session');
     expect([...container.querySelectorAll('.tab__label')].map((tab) => tab.textContent)).toEqual([
@@ -221,8 +223,9 @@ describe('App', () => {
     expect(container.textContent).toContain('/Users/example/.cuse/leader');
     // どのフォルダで動かすかは main が決める（renderer はタブの ID と大きさだけを渡す）
     expect(trusted).toEqual([{ tabId: 'trust' }]);
+    expect(container.textContent).toContain('信頼すると、自動で指揮役が起きます');
 
-    fireEvent.click(getByText('指揮役を起こす'));
+    fireEvent.click(getByText('▶ 指揮役を起こす'));
     expect(ensured()).toBe(1);
     fireEvent.click(getByText('別のフォルダで起こす'));
     expect(chosen()).toBe(1);
@@ -242,11 +245,37 @@ describe('App', () => {
     expect(container.querySelector('.top-bar__notices')?.textContent).toContain('スキルが別の内容です');
   });
 
-  it('承認のボタンは置かない', async () => {
+  it('cuse コマンドが無ければ、入れ方を上端に出す', async () => {
+    const { bridge } = makeBridge(leaderSnapshot);
+    const { container } = render(
+      <App environment={{ ...environment, cliInstalled: false }} bridge={bridge} />,
+    );
+    await flush();
+    expect(container.querySelector('.top-bar__notices')?.textContent).toContain('npm install -g');
+  });
+
+  it('まだ配下を起こしていなければ、指揮役に何を書けばよいかを見せる', async () => {
+    const firstSnapshot: Snapshot = {
+      ...leaderSnapshot,
+      ledger: { kind: 'ok', ledger: makeLedger({ leader: makeLeader() }) },
+    };
+    const { bridge } = makeBridge(firstSnapshot);
+    const { container } = render(<App environment={environment} bridge={bridge} />);
+    await flush();
+    expect(container.querySelector('.first-request')?.textContent).toContain('ここから依頼します');
+
+    // 配下を起こしたことがあれば出さない
+    cleanup();
+    const second = render(<App environment={environment} bridge={makeBridge(leaderSnapshot).bridge} />);
+    await flush();
+    expect(second.container.querySelector('.first-request')).toBeNull();
+  });
+
+  it('承認のボタンは置かない（「開いて承認する」は開くだけ）', async () => {
     const { bridge } = makeBridge(leaderSnapshot);
     const { container } = render(<App environment={environment} bridge={bridge} />);
     await flush();
     const labels = [...container.querySelectorAll('button')].map((button) => button.textContent);
-    expect(labels.some((label) => label?.includes('承認'))).toBe(false);
+    expect(labels.filter((label) => label?.includes('承認'))).toEqual(['開いて承認する']);
   });
 });
