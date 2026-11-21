@@ -3,6 +3,8 @@ name: cuse
 description: cuse の指揮役として、このマシンのほかの Claude Code セッション（配下）を起動・見守り・指示・停止するときに使う。cuse.app が起こした指揮役（cuse-leader）専用。
 ---
 
+<!-- cuse-managed: このファイルは cuse.app が置き、開くたびに最新の内容に書き直します。自分で書き換えて使うときは、この行を消してください（消すと書き直されなくなります）。 -->
+
 # cuse（指揮役向け）
 
 cuse は、指揮役が配下の Claude Code セッションを動かすための CLI です。すべて Bash から呼び、`--json` を付けると機械で読める形で返します。失敗は終了コード 1 と `{"error":{"kind","message"}}` です。

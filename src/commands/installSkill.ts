@@ -5,9 +5,24 @@ import { dirname, join } from 'node:path';
  * `cuse install-skill [--force]`。
  *
  * cuse スキル（コマンドの使い方）を `~/.claude/skills/cuse/SKILL.md` に置く。
- * `cuse start` は無ければ置く。普段のセッションでも使いたいときは自分で実行する。
- * 人が書き換えたものを黙って上書きしないよう、違う内容があるときは `--force` を求める。
+ * 指揮役を起こすたびに呼ばれ、cuse が置いたもの（{@link isManagedSkill}）なら最新の内容に書き直す
+ * （cuse を更新したら、スキルの説明も新しいコマンドに合わせて変わる必要があるため）。
+ * 人が自分で書いたものは黙って上書きせず、`differs` を返して知らせる（`--force` なら置き換える）。
  */
+
+/** cuse が置いたことを示す印。人が自分で書き換えて使うときは、この印を消してもらう。 */
+export const MANAGED_MARKER = '<!-- cuse-managed:';
+
+/**
+ * cuse が置いたスキルか。
+ *
+ * 印を入れる前の版（v0.2.5 まで）が置いたものも、cuse の説明文で始まっていれば cuse のものとみなす。
+ */
+export const isManagedSkill = (content: string): boolean =>
+  content.includes(MANAGED_MARKER) ||
+  /^---\nname: cuse\ndescription: cuse の指揮役として、このマシンのほかの Claude Code セッション（配下）を起動・見守り・指示・停止するときに使う。/.test(
+    content,
+  );
 
 export const SKILL_SOURCE = 'skill/cuse/SKILL.md';
 
@@ -52,7 +67,7 @@ export const installSkill = async (
   if (current === bundled) {
     return { path, status: 'unchanged' };
   }
-  if (current !== null && !options.force) {
+  if (current !== null && !options.force && !isManagedSkill(current)) {
     return { path, status: 'differs' };
   }
   await fs.write(path, bundled);
@@ -68,6 +83,6 @@ export const describeInstallSkill = (result: InstallSkillResult): string => {
     case 'unchanged':
       return `cuse スキルは最新です: ${result.path}`;
     case 'differs':
-      return `cuse スキルが別の内容で置かれています: ${result.path}。同梱の内容で置き換えるには cuse install-skill --force。`;
+      return `${result.path} に自分で書いた cuse スキルがあるため、cuse の最新の内容に書き直していません。cuse の内容に戻すには、このファイルを消してから cuse.app を開き直してください。`;
   }
 };
