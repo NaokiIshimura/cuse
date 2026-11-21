@@ -39,7 +39,11 @@ export const TerminalView = ({ bridge, tabId, open, active }: TerminalViewProps)
       return;
     }
     setConnection({ kind: 'connecting' });
-    const result = await open(term.cols, term.rows);
+    // 失敗を黙って捨てると、端末が真っ暗なまま理由が分からない。必ず画面に出す
+    const result = await open(term.cols, term.rows).catch((error: unknown) => ({
+      ok: false as const,
+      message: `端末を起こせませんでした: ${String(error)}`,
+    }));
     setConnection(result.ok ? { kind: 'open' } : { kind: 'closed', message: result.message });
   }, [open]);
 

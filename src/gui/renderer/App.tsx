@@ -20,7 +20,7 @@ const NO_AGENTS: readonly Agent[] = [];
 
 /** CLI が無いときの知らせ。指揮役は Bash から cuse コマンドを使うので、無いと配下を起こせない。 */
 export const CLI_MISSING_NOTICE =
-  'cuse コマンドが見つかりません。指揮役が配下を起こすのに使うので、端末で npm install -g https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse.tgz を実行してください。';
+  'cuse コマンドが見つかりません。指揮役が配下を起こすのに使うので、端末で npm install -g https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse.tgz を実行し、cuse.app を開き直してください（入れてあるのに出るときは、ログインシェルの PATH に npm の bin が入っているか確かめてください）。';
 
 /** 上端に出す知らせ（CLI が無い、指揮役をそろえたときの警告など）。 */
 const leaderNotices = (

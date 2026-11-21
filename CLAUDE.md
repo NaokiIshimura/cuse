@@ -111,6 +111,9 @@ cuse が Claude Code の設定（`~/.claude.json`）に信頼を書き込むこ�
 埋め込み端末（node-pty）で動かすのは `claude attach <短縮 ID>` だけ。相手は main が台帳と一覧から決め（`src/gui/attachTarget.ts`）、
 renderer から来た値でコマンドを組み立てない。タブやウィンドウを閉じても attach を切るだけで、セッションは止めない。
 node-pty はネイティブモジュール。`.app` には macOS 用の prebuild だけを入れ、asar の外（`app.asar.unpacked`）に置く（`gui:package`）。
+npm で入れた node-pty は `prebuilds/darwin-*/spawn-helper` の実行権限が落ちていることがあり（既知の不具合）、
+そのままだと端末が起きずに真っ暗になる。`gui:package` で `chmod +x` してから組み、main も端末を起こす前に
+`ensureSpawnHelperExecutable`（`src/core/ptyHelper.ts`）で確かめる。端末を起こせなかった理由は必ず画面に出す。
 
 ### キャラクター（AA）
 
