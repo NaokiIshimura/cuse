@@ -167,48 +167,61 @@ export const getMiniFrame = (frame: number): string => {
 /*
  * 指揮役（cuse-leader）の AA。cuse だけのもの（cc-park には無い）。
  *
- * 配下と同じ Clawd の右側（桁 9）に 1 桁足し、指揮棒を持たせる。
- * - ふだんは左手（桁 8）を上げ、手の右下から右上へ伸びる棒 `▞`（左下と右上の象限）を頭の行に置く
- * - 作業中に振り下ろすときだけ手を下ろし、身体の端から右下へ伸びる棒 `▚`（左上と右下の象限）を身体の行に置く
- * どちらも手・身体の端と象限が隣り合い、棒が離れて見えない。
+ * 配下と同じ Clawd の左側（向かって左。キャラクター自身の右手側）に 1 桁足し、右手に指揮棒を持たせる。
+ * 右手は身体の端の右半分（桁 0 の `▝`）にしか乗らず、そのままでは足した桁の棒と象限が隣り合わないので、
+ * 指揮役は身体の行の端を `▀`（腕を左へ伸ばした形）にし、右手をその左半分の上（`▖`）に置く。
+ * - ふだんは右手を上げ、手の左から左上へ伸びる棒 `▚`（左上と右下の象限）を頭の行に置く
+ * - 作業中に振り下ろすときだけ手を下ろし、腕の端から左下へ伸びる棒 `▞`（右上と左下の象限）を身体の行に置く
+ * どちらも手・腕の端と象限が隣り合い、棒が離れて見えない。
+ * 右手がふさがるので、承認待ちや完了で手を振るのは左手（桁 8）にする。
  * 作業中は、歩く代わりに指揮棒を振る（上げる → 下ろす）。
  */
 
 /** 指揮役の AA の桁数（配下より指揮棒の 1 桁ぶん広い）。 */
 export const LEADER_WIDTH = CHARACTER_WIDTH + 1;
 
-const BATON_UP = '▞';
-const BATON_DOWN = '▚';
+/** 指揮棒の桁（いちばん左）。画面ではこの桁だけ色を変える。 */
+export const LEADER_BATON_COLUMN = 0;
+
+const BATON_UP = '▚';
+const BATON_DOWN = '▞';
+/** 指揮棒を持つ右手（上げたとき）。腕（`▀`）の左半分の上に乗る。 */
+const BATON_HAND = '▖';
+/** 指揮役の身体の行の端（腕を左へ伸ばした形）。 */
+const LEADER_ARM = '▀';
 
 /**
- * 配下の 1 フレームに指揮棒を足す。
- * 指揮役はふだん左手（桁 8）と指揮棒を上げておく（`raise`）。下ろすのは、作業中に振り下ろすときだけ。
+ * 配下の 1 フレームから、指揮役の 1 フレームを作る。
+ * `raise` は指揮棒（右手）を上げるか。配下が手を上げているフレームでは、空いている左手を上げる。
  */
-const withBaton = (base: string, raise: boolean): string => {
+const leaderFrame = (base: string, raise: boolean): string => {
   const [head = '', body = '', legs = ''] = base.split('\n');
-  const cells = [...head];
-  cells[CHARACTER_WIDTH - 1] = raise ? RAISED : cells[CHARACTER_WIDTH - 1] ?? LOWERED;
-  const raised = cells[CHARACTER_WIDTH - 1] === RAISED;
+  const headCells = [...head];
+  const waving = headCells[0] === RAISED || headCells[CHARACTER_WIDTH - 1] === RAISED;
+  headCells[0] = raise ? BATON_HAND : LOWERED;
+  headCells[CHARACTER_WIDTH - 1] = waving ? RAISED : LOWERED;
+  const bodyCells = [...body];
+  bodyCells[0] = LEADER_ARM;
   return [
-    `${cells.join('')}${raised ? BATON_UP : ' '}`,
-    `${body}${raised ? ' ' : BATON_DOWN}`,
-    `${legs} `,
+    `${raise ? BATON_UP : ' '}${headCells.join('')}`,
+    `${raise ? ' ' : BATON_DOWN}${bodyCells.join('')}`,
+    ` ${legs}`,
   ].join('\n');
 };
 
 /** 作業中の指揮役は、指揮棒を上げ下げする。 */
-const LEADER_CONDUCTING: readonly string[] = [withBaton(frame('leftHand'), true), withBaton(frame('down'), false)];
+const LEADER_CONDUCTING: readonly string[] = [leaderFrame(frame('down'), true), leaderFrame(frame('down'), false)];
 
 /**
  * 指揮役の、状態とフレーム番号に対応する AA。
- * 作業中は指揮棒を振り、それ以外は配下と同じ動き（承認待ちに右手で呼ぶ、など）に、上げた指揮棒を足す。
+ * 作業中は指揮棒を振り、それ以外は指揮棒を上げたまま、配下と同じ間合いで左手を振る（承認待ちで呼ぶ、など）。
  */
 export const getLeaderFrame = (state: CharacterState, frame: number): string => {
   if (state === 'working') {
     const index = ((frame % LEADER_CONDUCTING.length) + LEADER_CONDUCTING.length) % LEADER_CONDUCTING.length;
     return LEADER_CONDUCTING[index] ?? '';
   }
-  return withBaton(getFrame(state, frame), true);
+  return leaderFrame(getFrame(state, frame), true);
 };
 
 /** 状態に対応する見た目を取得する。 */

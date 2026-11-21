@@ -1226,7 +1226,7 @@ button {
   color: var(--fg-muted);
 }
 
-/* 指揮役の指揮棒（AA の右端の桁）。身体と同じ色だとしっぽに見えるので白くする */
+/* 指揮役の指揮棒（AA のいちばん左の桁）。身体と同じ色だと指揮棒に見えないので白くする */
 .character__baton {
   color: var(--ink-white);
 }
