@@ -32,6 +32,8 @@ export interface FakeWorld {
   version: string;
   /** git リポジトリではないディレクトリ */
   readonly nonRepositories: Set<string>;
+  /** Claude Code が信頼していないディレクトリ（`claude --bg` が断る） */
+  readonly untrusted: Set<string>;
   /** `claude --resume` が会話を写して新しい ID で始めるか */
   resumeCopies: boolean;
   /** スキルなど、cuse が書いたファイル（パス → 中身） */
@@ -65,6 +67,7 @@ export const createFakeWorld = (
     ledger: options.ledger ?? emptyLedger(),
     version: '2.1.325',
     nonRepositories: new Set<string>(),
+    untrusted: new Set<string>(),
     resumeCopies: false,
     files: new Map<string, string>(),
   } as Omit<FakeWorld, 'deps'> & { deps?: OpsDeps };
@@ -96,6 +99,14 @@ export const createFakeWorld = (
       const { pid: _pid, status: _status, ...rest } = agent;
       world.agents[index] = { ...rest, state: 'stopped' };
       return '';
+    }
+    if (args.includes('--bg') && world.untrusted.has(runOptions.cwd ?? '')) {
+      // 本物と同じく、コマンド全体が message に入り、理由は標準エラーに出る
+      throw Object.assign(new Error(`Command failed: claude ${args.join(' ')}`), {
+        code: 1,
+        stderr:
+          'Workspace not trusted. The home directory is trusted one session at a time — start this from an interactive terminal there, or from a project directory.\n',
+      });
     }
     if (args.includes('--bg')) {
       const resume = optionValue(args, '--resume');

@@ -171,6 +171,9 @@ export const App = ({ environment, bridge }: AppProps) => {
           onRetryLeader={() => {
             void bridge.ensureLeader();
           }}
+          onChooseLeaderFolder={() => {
+            void bridge.chooseLeaderFolder();
+          }}
         />
         <Placeholder
           title="PREVIEW"
