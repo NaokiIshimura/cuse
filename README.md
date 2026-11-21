@@ -19,8 +19,63 @@
 
 ## インストール
 
+[Releases](../../releases) から CLI の npm パッケージと、macOS 用の `.app` をダウンロードできます。
+`main` へマージされると、`package.json` の `version` で自動的にリリースされます。
+
+| ファイル | 中身 |
+| --- | --- |
+| `cuse-<version>.tgz` / `cuse.tgz` | CLI（`cuse status` / `agents` / `output` / `app`）の npm パッケージ |
+| `cuse-<version>-darwin-arm64.zip` / `cuse-darwin-arm64.zip` | ウィンドウの `.app`（Apple シリコン、M1 以降） |
+| `cuse-<version>-darwin-x64.zip` / `cuse-darwin-x64.zip` | ウィンドウの `.app`（Intel Mac） |
+
+バージョンを含まない方は中身が同じ複製で、下記の手順はこちらを使って常に最新版を取得します。
+
+### CLI
+
 ```bash
-npm install -g cuse
+npm install -g https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse.tgz
+```
+
+`cuse app` でウィンドウも開けます（Electron は npm の依存として一緒に入ります）。
+アンインストールは `npm uninstall -g cuse` です。
+
+### .app（macOS）
+
+配布用の証明書で署名・公証をしていないため、ブラウザでダウンロードすると初回は Gatekeeper に止められます。
+ターミナルで次のコマンドを実行すると、最新版をダウンロードして `/Applications` に置けます（古い `cuse.app` は置き換えます）。
+
+Apple シリコン（M1 以降）:
+
+```bash
+curl -fL -o /tmp/cuse.zip https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse-darwin-arm64.zip && \
+  rm -rf /Applications/cuse.app && \
+  ditto -x -k /tmp/cuse.zip /Applications && \
+  rm /tmp/cuse.zip
+```
+
+Intel Mac:
+
+```bash
+curl -fL -o /tmp/cuse.zip https://github.com/NaokiIshimura/cuse/releases/latest/download/cuse-darwin-x64.zip && \
+  rm -rf /Applications/cuse.app && \
+  ditto -x -k /tmp/cuse.zip /Applications && \
+  rm /tmp/cuse.zip
+```
+
+`curl` でダウンロードしたファイルには隔離属性（`com.apple.quarantine`）が付かないため、Gatekeeper に止められません。
+
+ブラウザでダウンロードした場合は、zip を展開して `cuse.app` を `/Applications` に置き、隔離属性を外してください。
+
+```bash
+xattr -dr com.apple.quarantine /Applications/cuse.app
+```
+
+### ソースから
+
+```bash
+npm install
+npm run build
+npm link
 ```
 
 ## コマンド（第 1 段階）
@@ -136,7 +191,8 @@ npm install
 npm run typecheck
 npm test
 npm run build
-npm run gui:dev
+npm run gui:dev       # ビルドしてウィンドウを起動
+npm run gui:package   # .app にパッケージ化（macOS）
 ```
 
 状態の読み取りや Clawd の AA は [cc-park](https://github.com/NaokiIshimura/cc-park) v0.25.0 から写しています

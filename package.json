@@ -22,6 +22,8 @@
     "start": "node dist/cli.js",
     "gui": "ELECTRON_RUN_AS_NODE= electron dist/gui/main.js",
     "gui:dev": "npm run build && npm run gui",
+    "gui:package": "npm run build && electron-packager . --name=cuse --app-bundle-id=io.github.naokiishimura.cuse --out=release --overwrite --ignore=\"^/(?!dist($|/)|package\\.json$)\"",
+    "postgui:package": "for app in release/cuse-darwin-*/cuse.app; do codesign --force --deep --sign - \"$app\" && codesign --verify --deep --strict \"$app\" || exit 1; done",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.gui.json"
   },
@@ -38,6 +40,7 @@
     "react": "^19.3.0"
   },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",

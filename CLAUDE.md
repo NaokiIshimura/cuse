@@ -29,7 +29,16 @@ npm run typecheck   # 本体・テスト・GUI renderer の 3 構成すべて型
 npm test            # 全テスト
 npx vitest run <ファイルパス>   # テストは対象を指定して実行する
 npm run gui:dev     # ビルドしてウィンドウを起動（cuse app と同じ）
+npm run gui:package # .app にパッケージ化（macOS。ad-hoc 署名まで行う）
 ```
+
+## リリース
+
+`main` へマージすると `.github/workflows/release.yml` が CLI の npm パッケージ（`cuse-<version>.tgz`）と
+arm64 / x64 の `.app` をビルドし、`package.json` の `version` に対応するタグ（`v<version>`）が未公開なら Releases へ公開する。
+既に公開済みならリリースは作らず、実行ログの artifact にだけ残す。
+**配布したいときは `package.json` の `version` を上げてからマージする。**
+README のインストール手順は `releases/latest/download/` のバージョンを含まない名前を指すので、`version` を上げても書き換えなくてよい。
 
 ## 安全の約束（どの段階でも崩さない）
 
