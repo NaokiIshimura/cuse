@@ -260,6 +260,20 @@ button {
   font-family: var(--font-mono);
 }
 
+/*
+ * Clawd の足の行は文字の上半分しか使わないので、3 行ぶんの箱の中で絵が上に寄って見える。
+ * 塗られた部分が箱の上下の真ん中に来るよう、少し下げる（実測で 0.3 文字ぶん）。
+ */
+.character {
+  --aa-drop: 0.3em;
+}
+
+.character:not(.character--large) {
+  position: relative;
+  /* 小さい字では字形の上下の余りの割合が違うので、少し多めに下げる（実測） */
+  top: calc(var(--aa-drop) + 1px);
+}
+
 .worker-card__info {
   flex: 1;
   min-width: 0;
@@ -412,7 +426,8 @@ button {
 
 .character--large {
   font-size: 18px;
-  padding: 8px 10px;
+  /* 上下の余白をそろえる（下の .character の説明と同じ理由。こちらは枠ごと動かさず、内側の余白で下げる） */
+  padding: calc(8px + var(--aa-drop)) 10px calc(8px - var(--aa-drop));
   border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
