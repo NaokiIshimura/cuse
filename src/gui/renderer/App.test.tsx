@@ -109,6 +109,9 @@ const makeBridge = (snapshot: Snapshot) => {
       openSessionListener = listener;
       return () => undefined;
     },
+    getPreviewItems: async () => [],
+    readPreview: async () => ({ kind: 'unavailable', message: '' }),
+    openExternalUrl: async () => true,
     openTrustTerminal: async (request) => {
       trusted.push({ tabId: request.tabId });
       return { ok: true };

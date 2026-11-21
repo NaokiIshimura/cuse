@@ -11,8 +11,8 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 そのため `.app` は asar にしない（`--no-asar`）。CLI が読む `node_modules/meow` と、端末の `node_modules/node-pty` を `.app` に入れる。
 何をどう作るかは `docs/HANDOFF.md`、設計の理由は `docs/cuse 企画書（単体ツール版）.md` にある。
 
-いまは **第 3 段階（v0.3、回収と片付け）の途中**。第 2 段階までに加えて `review` / `clean`、承認待ちの OS 通知まで入った。
-右のプレビューはこの後に入れる。第 4 段階（MCP サーバー版など）は、Naoki が第 3 段階を確かめてから始める。
+いまは **第 3 段階（v0.3、回収と片付け）**。第 2 段階までに加えて `review` / `clean`、承認待ちの OS 通知、右のプレビューまで入った。
+第 4 段階（MCP サーバー版など）は、Naoki が第 3 段階を確かめてから始める。
 
 `clean` は `src/core/gitStatus.ts` の `isSafeToClean` が true のものだけを `claude rm` する。分からないこと
 （リモートが無くて push したか確かめられない、など）は「残す」側に倒す。配下が作業した場所は、`claude agents` の `cwd`
@@ -119,6 +119,10 @@ node-pty はネイティブモジュール。`.app` には macOS 用の prebuild
 npm で入れた node-pty は `prebuilds/darwin-*/spawn-helper` の実行権限が落ちていることがあり（既知の不具合）、
 そのままだと端末が起きずに真っ暗になる。`gui:package` で `chmod +x` してから組み、main も端末を起こす前に
 `ensureSpawnHelperExecutable`（`src/core/ptyHelper.ts`）で確かめる。端末を起こせなかった理由は必ず画面に出す。
+
+右のプレビューは、transcript から拾ったもの（`src/shared/previewItems.ts`）だけを開く。renderer は鍵（`previewKey`）を渡すだけで、
+main が読むたびに transcript を読み直して、そのセッションに出てきたものかを確かめる（任意のファイルを読ませない）。
+Web 表示は `<webview>` を `will-attach-webview` で隔離する（Node 連携なし・preload なし・`cuse-preview` の専用セッション領域・http(s) のみ・新しいウィンドウは開かない）。
 
 ### キャラクター（AA）
 

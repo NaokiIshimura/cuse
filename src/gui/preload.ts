@@ -47,6 +47,11 @@ const bridge: CuseBridge = {
   ensureLeader: () => ipcRenderer.invoke(IPC_CHANNELS.ensureLeader),
   chooseLeaderFolder: () => ipcRenderer.invoke(IPC_CHANNELS.chooseLeaderFolder),
   cleanWorkers: () => ipcRenderer.invoke(IPC_CHANNELS.cleanWorkers),
+  getPreviewItems: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.getPreviewItems, sessionId),
+  readPreview: (sessionId: string, key: string, reveal: boolean) =>
+    ipcRenderer.invoke(IPC_CHANNELS.readPreview, sessionId, key, reveal),
+  openExternalUrl: (sessionId: string, url: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.openExternalUrl, sessionId, url),
   onOpenSession: (listener) => {
     const handler = (_event: IpcRendererEvent, sessionId: string) => {
       listener(sessionId);
