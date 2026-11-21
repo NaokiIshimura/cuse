@@ -39,6 +39,7 @@ npx vitest run <ファイルパス>   # テストは対象を指定して実行�
 npm run gui:dev     # ビルドしてウィンドウを起動（cuse app と同じ）
 npm run gui:package # .app にパッケージ化（macOS。ad-hoc 署名まで行う）
 npm run copies:check -- <cc-park のディレクトリ>  # cc-park から写したファイルと写し元のずれ
+npm run icon        # assets/icon.svg からアプリアイコン（icon.icns / icon.png）を作り直す
 ```
 
 ## リリース
@@ -72,6 +73,7 @@ README のインストール手順は `releases/latest/download/` のバージ�
 | `schema/` | 台帳 `~/.cuse/ledger.json` の JSON Schema（他のツール向けに公開） |
 | `prompts/` | 指揮役・配下の心得（`--append-system-prompt` で渡す）。npm パッケージに同梱する |
 | `skill/cuse/SKILL.md` | cuse スキル（指揮役向けのコマンドの使い方）。指揮役を起こすたびに `~/.claude/skills/cuse/` に置く。`cuse-managed` の印がある（または前の版の cuse の説明文で始まる）ものは cuse のものとして最新に書き直し、人が書いたものは上書きしない。印は消さないこと |
+| `assets/` | アプリアイコン。原画は `icon.svg`。描き直したら `npm run icon` で `icon.icns`（.app 用）と `icon.png`（開発中の Dock 用）を作り直す（Chromium を使う。CI では作らない） |
 | `test/fixtures/` | `claude agents --json` と transcript の見本 |
 | `test/support/fakeClaude.ts` | 本物の `claude` の代わりに使う偽物（`--bg` / `--resume` / `stop` / `agents` / `git rev-parse` に答え、呼ばれ方を記録する） |
 

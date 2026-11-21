@@ -443,8 +443,16 @@ ipcMain.handle(
 /** vite の dev サーバ経由で起動する場合の URL。未設定ならビルド済み HTML を読む。 */
 const devServerUrl = process.env['CUSE_DEV_SERVER'];
 
+/**
+ * 開発中（`npm run gui:dev`）に Dock とウィンドウへ出すアイコン。
+ * .app には electron-packager が assets/icon.icns を入れるので、パッケージ済みのときは何もしない
+ * （assets/ は .app に入れない）。
+ */
+const devIconPath = app.isPackaged ? undefined : join(HERE, '..', '..', 'assets', 'icon.png');
+
 const createWindow = async (): Promise<void> => {
   const window = new BrowserWindow({
+    ...(devIconPath === undefined ? {} : { icon: devIconPath }),
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
     minWidth: MIN_WINDOW_WIDTH,
@@ -500,6 +508,16 @@ const preparePath = async (): Promise<void> => {
   process.env['PATH'] = await resolveShellPath({ home });
 };
 
+const prepareDevIcon = (): void => {
+  if (devIconPath !== undefined && process.platform === 'darwin') {
+    try {
+      app.dock?.setIcon(devIconPath);
+    } catch (error) {
+      console.warn('開発中のアイコンを設定できませんでした:', error);
+    }
+  }
+};
+
 const prepareVersion = async (): Promise<void> => {
   claudeVersion = await checkClaudeVersion();
 };
@@ -526,6 +544,7 @@ const prepareCuseCommand = async (): Promise<void> => {
  */
 app
   .whenReady()
+  .then(prepareDevIcon)
   .then(preparePath)
   .then(prepareVersion)
   .then(prepareCuseCommand)
