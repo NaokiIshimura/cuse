@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NaokiIshimura/cuse/blob/main/schema/ledger.schema.json",
+  "title": "cuse ledger (~/.cuse/ledger.json)",
+  "description": "cuse が起動した指揮役と配下の記録。項目を足すのはよいが、削る・意味を変えるときは version を上げる。",
+  "type": "object",
+  "required": ["version", "workers"],
+  "properties": {
+    "version": { "const": 1 },
+    "leader": {
+      "description": "指揮役。まだ起動していなければ null",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["sessionId", "name", "startedAt"],
+          "properties": {
+            "sessionId": { "type": "string" },
+            "name": { "type": "string" },
+            "startedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    },
+    "workers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "sessionId", "task", "cwd", "startedAt", "endedAt", "endReason", "promptCount"],
+        "properties": {
+          "name": { "type": "string", "description": "起動後の本当の名前" },
+          "shortId": { "type": ["string", "null"], "description": "background セッションの短縮 ID" },
+          "sessionId": { "type": "string" },
+          "task": { "type": "string" },
+          "cwd": { "type": "string" },
+          "worktree": { "type": ["string", "null"] },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "endedAt": { "type": ["string", "null"], "format": "date-time" },
+          "endReason": { "type": ["string", "null"], "description": "kill の理由など" },
+          "promptCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

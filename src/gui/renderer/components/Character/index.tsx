@@ -1,0 +1,22 @@
+// 写し元: cc-park `src/gui/renderer/components/Character/index.tsx` @ `d1f0f2d`（v0.25.0）
+import type { CharacterState } from '../../../../types/agent.js';
+import { getAppearance, getFrame } from '../../../../shared/characters.js';
+import { inkColor } from '../../colors.js';
+
+interface CharacterProps {
+  readonly state: CharacterState;
+  readonly frame: number;
+}
+
+/**
+ * 状態とフレーム番号から AA を描画する。
+ * 桁が崩れないよう等幅フォント＋`white-space: pre`（CSS 側で指定）で出す。
+ *
+ * サブエージェントのミニキャラクターは行の幅いっぱいまで横に並べるため、
+ * ここではなく AgentRow が AA の下へ別の行として描く。
+ */
+export const Character = ({ state, frame }: CharacterProps) => (
+  <pre className="character" style={{ color: inkColor(getAppearance(state).color) }}>
+    {getFrame(state, frame)}
+  </pre>
+);

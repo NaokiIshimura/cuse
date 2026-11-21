@@ -88,38 +88,38 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 | --- | --- | --- | --- |
 | `src/types/agent.ts` | `claude agents --json` の生データと整えた型 | 1 | そのまま |
 | `src/core/runCommand.ts` | 外部コマンド実行の抽象（テストで差し替え） | 1 | そのまま |
-| `src/core/fetchAgents.ts` | `claude agents --json` の取得と失敗の種別 | 1 | GUI 向けの再輸出は削る |
+| `src/core/shellPath.ts` | Finder から起動したアプリの PATH を補う | 1 | .app から `claude` を見つけるために要る |
+| `src/core/fetchAgents.ts` | `claude agents --json` の取得と失敗の種別 | 1 | そのまま |
 | `src/core/normalizeAgent.ts` | 生の状態文字列から表示用の状態への対応 | 1 | そのまま |
-| `src/core/agentsDebug.ts` | 出力仕様の変化を見張る仕組み | 1 | 警告の出し先を標準エラーに |
+| `src/core/agentsDebug.ts` | 出力仕様の変化を見張る仕組み | 1 | そのまま |
 | `src/core/readSessionMeta.ts` | transcript から最終プロンプト・トークン使用量・サブエージェント | 1 | そのまま |
-| `src/shared/parseTranscript.ts` | transcript（JSONL）の解釈 | 1 | `output` 用に「最後の assistant 発言」を取る関数を足す |
+| `src/shared/parseTranscript.ts` | transcript（JSONL）の解釈 | 1 | `output` 用に「最後の assistant 発言」を取る関数を足す。第 3 段階でプレビュー用に Read / Edit / WebFetch を拾う関数を足す |
 | `src/shared/transcriptPath.ts` | transcript の置き場所 | 1 | そのまま |
-| `src/core/diffAgents.ts` | 前回と今回の状態遷移 | 1 | `monitor` と第 2 段階の `wait` で使う |
-| `src/shared/statusDetail.ts`、`attention.ts`、`sortAgents.ts`、`subagents.ts` | 状態の説明、要対応の判定、並べ替え、サブエージェント | 1 | Dock バッジなど GUI 部分は削る |
-| `src/shared/characters.ts`、`aaBitmap.ts` | Clawd の AA と状態ごとのコマ | 1 | 端末に描くため ANSI 色への対応を足す。ビットマップ変換は不要なら写さない |
+| `src/core/diffAgents.ts` | 前回と今回の状態遷移 | 1 | 上端のバーの警告と第 2 段階の `wait` で使う |
+| `src/shared/statusDetail.ts`、`attention.ts`、`sortAgents.ts`、`subagents.ts` | 状態の説明、要対応の判定、並べ替え、サブエージェント | 1 | Dock バッジ向けの部分は削る |
+| `src/shared/characters.ts`、`aaBitmap.ts` | Clawd の AA と状態ごとのコマ | 1 | そのまま |
+| `src/gui/` の main / preload / ipc の骨組み、renderer のキャラクター表示部品 | Electron アプリの土台と Clawd の描画 | 1 | ミニ表示、最前面固定、透過、メニューバー、Dock バッジは写さない |
 | `src/core/launchAgent.ts`、`stopAgent.ts`、`src/shared/resumeCommand.ts` | 起動・停止・再開のコマンド組み立て | 2 | 第 1 段階では写さない |
 
-写さないもの: `src/gui/`、`shellPath.ts`（Finder 起動の GUI 用）、予約起動（`scheduledLaunch.ts`）。
+写さないもの: 予約起動（`scheduledLaunch.ts`）、cc-park 固有のウィンドウ機能（ミニ表示、最前面固定、透過、四隅への移動）、メニューバーと Dock の件数表示。
 
 ## コマンドと台帳の仕様
 
-指揮役が Bash から呼ぶコマンド 10 個と、人が開く画面 3 個です。配下は名前で指します。「段階」は入れる時期です。
+指揮役が Bash から呼ぶコマンド 10 個と、人が使うアプリ `cuse app` です。muse の `attach` / `dashboard` / `monitor` はアプリ 1 つにまとめます。配下は名前で指します。「段階」は入れる時期です。
 
 | コマンド | 段階 | 動き |
 | --- | --- | --- |
 | `status [--json]` | 1 | 配下の数、状態ごとの件数、人の対応が要るもの |
 | `agents [--all] [--json]` | 1 | 配下（`--all` で全セッション）の状態、`waitingFor`、承認待ちのツール、最後の指示、コンテキスト使用率 |
 | `output <名前> [--lines N] [--json]` | 1 | 最後の報告と `claude logs` の末尾 |
-| `monitor` | 1 | 健全性の TUI（画面の節） |
-| `start [--cwd] [--new]` | 2 | 指揮役 `cuse-leader` を起動し attach。既にいれば開く。編集系ツールを外し、cuse スキルと心得を読み込ませる |
-| `attach` | 2 | `cuse-leader` の会話を開く（tmux があれば 3 列） |
+| `app` | 1〜3 | cuse のウィンドウを開く。第 1 段階は上端のバーと左の一覧、第 2 段階で中央の埋め込み端末、第 3 段階で右のプレビュー |
+| `start [--cwd] [--new]` | 2 | 指揮役 `cuse-leader` を起動し、cuse のウィンドウを開く。既にいればそれを開く。編集系ツールを外し、cuse スキルと心得を読み込ませる |
 | `spawn "<タスク>" <名前> [--cwd --agent --model]` | 2 | `claude --bg --name` で起動し、台帳に記録。本当の名前と ID を返す |
 | `prompt <名前> "<指示>"` | 2 | 終わった配下には `claude --resume <UUID> --bg`。動いていれば「`SendMessage` で送る」よう返す |
 | `wait <名前…> [--until idle\|attention\|done] [--timeout]` | 2 | 条件が成り立つまで待ち、「誰が何のために止まったか」を返す |
 | `kill <名前> --reason "<理由>"` | 2 | `claude stop` で止め、理由を台帳に残す |
 | `review <名前>` | 3 | worktree のブランチ、`git diff --stat`、未 commit / 未 push、PR、最後の報告 |
 | `clean` | 3 | 完了した配下を `claude rm` で片付ける。未 commit / 未 push は残す |
-| `dashboard` | 3 | 左に配下、中央に選んだ配下の詳細、右にプレビューの TUI |
 
 `--json` の出力は安定した形にし、変えるときはバージョンの minor を上げて README に書きます。失敗は終了コード 0 以外と、`{"error":{"kind","message"}}` で返します。
 
@@ -143,42 +143,45 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 - JSON Schema をリポジトリに同梱し、cc-park など他のツールが読めるように公開する。
 - 項目を足すのはよいが、削る・意味を変えるときは `version` を上げる。
 
-## 画面（TUI）の仕様
+## 画面（GUI）の仕様
 
-見た目の完成形は [cuse GUI デザイン](https://claude.ai/artifact/Rtxxfb7WABe6atwGFfU644) です。端末の中でこの配置と配色を再現します。TUI のライブラリは Ink（React）を第一候補とし、別のものを使う場合は理由を PR に書いてください。
+画面はデスクトップアプリだけです。見た目の完成形は [cuse GUI デザイン](https://claude.ai/artifact/Rtxxfb7WABe6atwGFfU644) で、配置と配色はこれに合わせます。Electron + React で、cc-park と同じ main / preload / renderer の構成にします。
 
-**配置（3 列）**
+| 場所 | 中身 | 入る段階 |
+| --- | --- | --- |
+| 上端のバー | `cuse` の印、指揮役の名前と状態、配下数、対応待ち数、コンテキスト使用率。健全性の警告（止まっている配下、長い承認待ち、上限に近い同時実行数） | 1 |
+| 左 | 配下のカード一覧。承認待ちが先頭。各カードに Clawd の AA・名前・状態・経過時間・最後の動き。終わった配下は「DONE」の下に薄く | 1（「開く」は 2） |
+| 中央 | 埋め込み端末で `claude attach cuse-leader` をそのまま動かす。上部に指揮役の大きめの Clawd と「指揮役」の印。左で配下を「開く」とタブを足して `claude attach <配下>` を開き、人はそこで承認する | 2 |
+| 右 | プレビュー。セッションに出たファイル・差分・画像・Web サイト。上にタブ、下に表示履歴 | 3 |
 
-| 列 | 中身 |
-| --- | --- |
-| 上端の 1 行 | `cuse` の印、指揮役の名前と状態、配下数、対応待ち数、指揮役のコンテキスト使用率 |
-| 左 | 配下の一覧。承認待ちが先頭。各行は Clawd の AA・名前・状態・経過時間・最後の動き。終わった配下は「DONE」の下に薄く |
-| 中央 | `attach` では指揮役の会話（上部に指揮役の大きめの Clawd）。`dashboard` では選んだ配下の詳細、`monitor` では健全性 |
-| 右 | プレビュー。セッションに出たファイル・差分・画像・Web サイト。上にタブ、下に表示履歴 |
-| 下端の 1 行 | キー操作: `Tab` 区画、`↑↓` 選ぶ、`a` 配下を開く、`o` 出力、`k` 止める、`p` プレビュー開閉、`f` 追いかけ固定、`b` ブラウザ |
+**中央の埋め込み端末**
+
+- xterm.js と node-pty。cuse 独自の入力欄は作らず、Claude Code の画面をそのまま使う。
+- node-pty は Electron のバージョンに合わせてビルドする。第 2 段階の最初に、埋め込んだ `claude attach` のキー操作・色・サイズ変更を試す。
+- ウィンドウを閉じても attach を切るだけで、指揮役と配下は止めない。
 
 **Clawd の AA**
 
-- cc-park の `characters.ts` の定義をそのまま使い、ANSI 色で描く。200ms ごとにコマを進める。
+- cc-park の `characters.ts` の定義と renderer の描き方をそのまま使う。200ms ごとにコマを進める。
 - 承認待ち = 右手が上下（黄）、作業中 = 足が動く（シアン）、完了直後 = 両手（明るい緑）、入力待ち・停止 = 静止（灰）。指揮役は cuse のアクセント色。
 - サブエージェントが動いていれば、AA の横にミニキャラクターを並べる。
-- 端末が狭いときは AA を省いて 1 行表示。`--no-anim` で動きを止める。
+- OS の「視差効果を減らす」設定がオンなら動きを止める。
 
 **プレビュー（第 3 段階）**
 
-- transcript の Read / Edit / Write / WebFetch の呼び出しと、会話に出た `localhost` などの URL を拾う。既定は指揮役を追いかけ、左で配下を選ぶとその配下に切り替える。
-- ファイルは色付き、変更は worktree の差分、画像は kitty / iTerm2 / sixel、Web サイトは読みやすい文字にして表示（画像を出せる端末ではスクリーンショットも）。
-- セッションに出ていないファイルや URL は開かない。JavaScript は動かさない。`.env` などは伏せて出す。
+- transcript の Read / Edit / Write / WebFetch の呼び出しと、会話に出た `localhost` などの URL を拾う。既定は指揮役を追いかけ、左で配下を選ぶとその配下に切り替える。「固定」で追いかけを止める。
+- ファイルは色付き、変更は worktree の差分、画像はそのまま、Web サイトはアプリ内の隔離したブラウザ表示（Node 連携なし、専用のセッション領域）。普段のブラウザで開くボタンも置く。
+- セッションに出ていないファイルや URL は開かない。`.env` などは伏せて出し、クリックでだけ中身を開く。
 
-`attach` は tmux で 3 列に分け（左と右は cuse、中央は `claude attach cuse-leader`）、幅が足りなければプレビューを閉じて 2 列にします。tmux がなければ指揮役だけを開きます。
+**置かないもの**: 承認ボタン、配下への指示欄、画面からの `spawn`、端末の TUI、Web UI。
 
 ## 第 2 段階以降の道筋
 
 段階ごとに minor を上げてリリースします。次の段階には、Naoki が前の段階を手元で確かめてから進みます。
 
-1. **v0.1.0 観察**: `status` / `agents` / `output` / `monitor`。完了の条件は、手で動かすセッションを正しく読めること。
-2. **v0.2.0 指揮**: `start` / `attach` / `spawn` / `wait` / `prompt` / `kill`、台帳、指揮役のトークン、cuse スキル（SKILL.md）と指揮役の心得、`install-skill`。完了の条件は、企画書の利用シーン（3 並列）を最後まで通せること。
-3. **v0.3.0 回収と片付け**: `review` / `clean` / `dashboard`、プレビュー、承認待ちの OS 通知。同じ時期に cc-park 側で台帳の読み取り（指揮役と配下のグループ表示）を出す。
+1. **v0.1.0 観察**: `status` / `agents` / `output` と、読み取り専用のウィンドウ（上端のバーと左の一覧）。完了の条件は、手で動かすセッションを正しく読めること。
+2. **v0.2.0 指揮**: `start` / `spawn` / `wait` / `prompt` / `kill`、台帳、指揮役のトークン、cuse スキル（SKILL.md）と指揮役の心得、`install-skill`、中央の埋め込み端末（指揮役と配下を開く）。完了の条件は、企画書の利用シーン（3 並列）を最後まで通せること。
+3. **v0.3.0 回収と片付け**: `review` / `clean`、右のプレビュー、配下の詳細表示、承認待ちの OS 通知。同じ時期に cc-park 側で台帳の読み取りを出す。
 4. **v0.4.0 以降 拡張**: MCP サーバー版（`cuse mcp`）、Claude Code プラグインとしての配布、共通コードの切り出し判断。
 
 **第 2 段階で気をつけること**
@@ -204,7 +207,7 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 **参考資料**
 
 - [cuse 企画書（単体ツール版）](https://claude.ai/artifact/6f5z5xE3oAVRjXyu1twzTj): 設計の理由、利用シーン、安全設計、リスク
-- [cuse GUI デザイン](https://claude.ai/artifact/Rtxxfb7WABe6atwGFfU644): `attach` 画面の見た目
+- [cuse GUI デザイン](https://claude.ai/artifact/Rtxxfb7WABe6atwGFfU644): アプリ画面の見た目
 - [cc-park リポジトリ](https://github.com/NaokiIshimura/cc-park): 移植元（v0.25.0）
 - [tribe CLI の muse スキル](https://hub.openclaw.ai/alexander-morris/skills/muse): コマンド体系の手本
 - [Claude Code: agent view](https://code.claude.com/docs/en/agent-view): background セッション、`claude agents` / `logs` / `stop` / `rm`

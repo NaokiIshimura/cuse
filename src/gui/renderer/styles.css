@@ -1,0 +1,390 @@
+/*
+ * cuse の配色。docs/cuse GUI デザイン.html（暗い配色）に合わせる。
+ * AA の色名 → CSS 変数の対応は renderer/colors.ts と対になっている。
+ */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0e1014;
+  --surface: #15181d;
+  --surface-raised: #1d2026;
+  --border: #262a31;
+  --fg: #e6e8eb;
+  --fg-muted: #9aa3ad;
+  --fg-faint: #5b636e;
+
+  /* cuse の印と指揮役の色 */
+  --accent: #d97757;
+
+  /* AA の色名との対応（cc-park の暗い配色を、デザインの色へ寄せたもの） */
+  --ink-default: #e6e8eb;
+  --ink-cyan: #4cc9f0;
+  --ink-yellow: #f5b544;
+  --ink-green: #5fd38d;
+  --ink-green-bright: #a6f0c0;
+  --ink-gray: #9aa3ad;
+  --ink-red: #ff7b72;
+  --ink-magenta: #e879f9;
+  --ink-blue-bright: #60a5fa;
+  --ink-white: #f2f3f5;
+
+  /* AA の桁がずれないよう、等幅を崩さない。日本語は M PLUS 1 Code があれば使う */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, 'M PLUS 1 Code', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.muted {
+  color: var(--fg-muted);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* 上端のバー */
+
+.top-bar {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.top-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  white-space: nowrap;
+}
+
+.brand {
+  background: var(--accent);
+  color: #141413;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.top-bar__spacer {
+  flex: 1;
+}
+
+.top-bar__stat {
+  color: var(--fg-muted);
+}
+
+.top-bar__stat strong {
+  color: var(--fg);
+}
+
+.top-bar__stat--alert,
+.top-bar__stat--alert strong {
+  color: var(--ink-yellow);
+  font-weight: 700;
+}
+
+.top-bar__notices {
+  margin: 0;
+  padding: 6px 16px 8px;
+  list-style: none;
+  color: var(--ink-yellow);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 3 列 */
+
+.columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(300px, 1.1fr) minmax(320px, 2fr) minmax(280px, 1.5fr);
+}
+
+.columns > section {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+
+.columns > section:last-child {
+  border-right: none;
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px 8px;
+}
+
+.pane-header__title {
+  color: var(--fg-muted);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+}
+
+/* 左の一覧 */
+
+.worker-list__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+}
+
+.worker-list__order {
+  margin: 0 4px 8px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.worker-list__cards,
+.worker-list__done {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.worker-list__empty {
+  margin: 16px;
+  color: var(--fg-muted);
+  line-height: 1.6;
+}
+
+.worker-list__empty p {
+  margin: 0 0 8px;
+}
+
+.link-button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--ink-cyan);
+}
+
+.link-button:hover {
+  background: var(--surface-raised);
+}
+
+.scope-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.scope-toggle button {
+  background: none;
+  border: none;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.scope-toggle button[aria-pressed='true'] {
+  background: var(--surface-raised);
+  color: var(--fg);
+}
+
+.worker-card {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+/* 承認待ちのカードは状態の色で縁取り、背景もうっすら染める */
+.worker-card--blocked {
+  border-color: color-mix(in srgb, var(--state-color) 70%, transparent);
+  background: color-mix(in srgb, var(--state-color) 8%, var(--surface));
+}
+
+.worker-card--justFinished {
+  border-color: color-mix(in srgb, var(--state-color) 50%, transparent);
+}
+
+.worker-card__avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.character,
+.mini {
+  margin: 0;
+  /* AA の 3 行が詰まって見えるよう行間を 1 にする */
+  line-height: 1;
+  white-space: pre;
+  font-family: var(--font-mono);
+}
+
+.worker-card__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.worker-card__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.worker-card__name {
+  flex: 1;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worker-card__elapsed {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.worker-card__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.worker-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state-color);
+}
+
+.worker-card__subagents {
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.worker-card__activity {
+  color: var(--fg-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worker-card__minis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+
+.worker-list__done-title {
+  margin: 20px 4px 8px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--fg-muted);
+}
+
+.done-row {
+  display: flex;
+  gap: 10px;
+  padding: 2px 8px;
+  color: var(--fg-faint);
+}
+
+.done-row__mark {
+  color: var(--ink-green);
+  opacity: 0.7;
+}
+
+.done-row__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 中央・右（後の段階で入る場所） */
+
+.placeholder__body {
+  flex: 1;
+  margin: 0 16px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.placeholder__stage {
+  margin: 0;
+  color: var(--fg-muted);
+  font-weight: 700;
+}
+
+.placeholder__description {
+  margin: 0;
+  color: var(--fg-faint);
+  line-height: 1.6;
+  max-width: 36em;
+}
+
+/* 下端 */
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 6px 16px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  background: var(--surface);
+}
