@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_OUTPUT_LINES } from './config/defaults.js';
@@ -99,6 +99,9 @@ export const defaultDeps = (): CliDeps => {
     checkVersion: (minimum) => checkClaudeVersion(minimum === undefined ? {} : { minimum }),
     readBundled: (relativePath) => readFile(`${PACKAGE_ROOT}${relativePath}`, 'utf8'),
     skillFs: fsSkillFileSystem,
+    makeDirectory: async (path) => {
+      await mkdir(path, { recursive: true });
+    },
     readLastReport: (agent) => readLastReport(agent, { home }),
     readLogs: (agent, lines) => readLogs(agent, { lines }),
   };

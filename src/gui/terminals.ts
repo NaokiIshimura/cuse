@@ -1,7 +1,8 @@
 /**
  * 埋め込み端末（node-pty）の管理。main プロセスで使う。
  *
- * タブ 1 つにつき `claude attach <短縮 ID>` を 1 つ動かす。閉じるときは attach を切るだけで、
+ * タブ 1 つにつき `claude attach <短縮 ID>` を 1 つ動かす。初回だけ、指揮役の居場所を信頼してもらうために
+ * そのフォルダで引数なしの `claude` を動かす（信頼の確認は Claude Code 自身が出し、人が答える）。閉じるときは attach を切るだけで、
  * 指揮役や配下のセッションは止めない（attach は表示と入力のつなぎ役でしかない）。
  * node-pty は差し替えられるようにして、テストではネイティブモジュールを使わない。
  */
@@ -34,8 +35,13 @@ export interface TerminalManagerOptions {
 export const clampSize = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 1000 ? value : fallback;
 
+/** 端末で動かすもの。`claude attach <短縮 ID>` か、指揮役の居場所を信頼してもらうための `claude`。 */
+export type TerminalCommand =
+  | { readonly kind: 'attach'; readonly shortId: string }
+  | { readonly kind: 'trust'; readonly folder: string };
+
 export interface TerminalManager {
-  readonly open: (tabId: string, shortId: string, cols: number, rows: number) => void;
+  readonly open: (tabId: string, command: TerminalCommand, cols: number, rows: number) => void;
   readonly write: (tabId: string, data: string) => void;
   readonly resize: (tabId: string, cols: number, rows: number) => void;
   readonly close: (tabId: string) => void;
@@ -56,15 +62,20 @@ export const createTerminalManager = (options: TerminalManagerOptions): Terminal
   };
 
   return {
-    open: (tabId, shortId, cols, rows) => {
+    open: (tabId, command, cols, rows) => {
       // 開き直すときは前の attach を切ってからつなぐ
       close(tabId);
-      const pty = options.spawnPty(options.command ?? 'claude', ['attach', shortId], {
-        cols: clampSize(cols, 80),
-        rows: clampSize(rows, 24),
-        cwd: options.cwd,
-        env: options.env(),
-      });
+      const pty = options.spawnPty(
+        options.command ?? 'claude',
+        // trust は引数なしの claude をそのフォルダで動かす。Claude Code 自身が信頼の確認を出し、人が答える
+        command.kind === 'attach' ? ['attach', command.shortId] : [],
+        {
+          cols: clampSize(cols, 80),
+          rows: clampSize(rows, 24),
+          cwd: command.kind === 'attach' ? options.cwd : command.folder,
+          env: options.env(),
+        },
+      );
       ptys.set(tabId, pty);
       pty.onData((data) => {
         if (ptys.get(tabId) === pty) {

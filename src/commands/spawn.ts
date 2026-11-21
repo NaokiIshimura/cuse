@@ -3,6 +3,7 @@ import { MAX_WORKERS } from '../config/defaults.js';
 import { findByShortId, isAlive, launchBackground } from '../core/claudeBg.js';
 import { activeLedgerWorkers, type Ledger, type LedgerWorker } from '../core/ledger.js';
 import { checkLeader, withoutLeaderToken } from '../core/leaderToken.js';
+import { isInsideStore } from '../core/paths.js';
 import type { Agent } from '../types/agent.js';
 import { listAgents, loadLedger, saveLedger, type OpsDeps } from './deps.js';
 import { failure, success, withWarnings, type Outcome } from './outcome.js';
@@ -115,6 +116,13 @@ export const runSpawn = async (input: SpawnInput, deps: OpsDeps): Promise<Outcom
 
   const cwd =
     input.cwd === undefined ? deps.cwd : isAbsolute(input.cwd) ? input.cwd : resolve(deps.cwd, input.cwd);
+  // 指揮役の居場所（~/.cuse/leader）はリポジトリではない。そこで配下を起こすと作業が台無しになる
+  if (isInsideStore(cwd, deps.home)) {
+    return failure({
+      kind: 'usage',
+      message: `${cwd} は cuse の置き場所なので、ここでは配下を起こせません。--cwd で作業するリポジトリを指定してください（例: cuse spawn "<タスク>" <名前> --cwd ~/work/app）。`,
+    });
+  }
   const warnings: string[] = [];
   const gitRepository = await isGitRepository(cwd, deps);
   if (!gitRepository) {

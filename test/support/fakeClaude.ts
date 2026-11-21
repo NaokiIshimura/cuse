@@ -38,6 +38,8 @@ export interface FakeWorld {
   resumeCopies: boolean;
   /** スキルなど、cuse が書いたファイル（パス → 中身） */
   readonly files: Map<string, string>;
+  /** cuse が作ったディレクトリ */
+  readonly directories: Set<string>;
   readonly deps: OpsDeps;
 }
 
@@ -70,6 +72,7 @@ export const createFakeWorld = (
     untrusted: new Set<string>(),
     resumeCopies: false,
     files: new Map<string, string>(),
+    directories: new Set<string>(),
   } as Omit<FakeWorld, 'deps'> & { deps?: OpsDeps };
 
   const runner: CommandRunner = async (command, args, runOptions) => {
@@ -170,6 +173,9 @@ export const createFakeWorld = (
     },
     checkVersion: async (minimum) => judgeClaudeVersion(world.version, minimum),
     readBundled: (relativePath) => readFile(join(ROOT, relativePath), 'utf8'),
+    makeDirectory: async (path) => {
+      world.directories.add(path);
+    },
     skillFs: {
       read: async (path) => world.files.get(path) ?? null,
       write: async (path, data) => {

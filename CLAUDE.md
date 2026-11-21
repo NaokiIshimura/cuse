@@ -99,8 +99,11 @@ IPC の口は `src/gui/ipc.ts` にまとめる。承認の口は作らない。
 
 ウィンドウを開くと main が `runStart`（`cuse start` と同じ処理）で指揮役をそろえる（`src/gui/leaderStartup.ts`）。
 重ねて走らせないようにしてあり、指揮役がマシンに 1 人という約束はそのまま守られる。`.app` にも `prompts/` と `skill/` を入れる。
-新しく起こす置き場所が決まらないとき（Finder から開いた・ホームフォルダ）は起こさず、人にフォルダを選んでもらう。
-Claude Code はホームフォルダや信頼していないフォルダでは `claude --bg` を断る。
+新しく起こす置き場所が決まらないとき（Finder から開いた・ホームフォルダ）は、指揮役の居場所 `~/.cuse/leader` で起こす
+（`runStart` の `newLeaderCwd`）。Claude Code はホームフォルダや信頼していないフォルダでは `claude --bg` を断るので、
+初回はそのフォルダで引数なしの `claude` を埋め込み端末で動かし、Claude Code 自身の信頼の確認に人が答える。
+cuse が Claude Code の設定（`~/.claude.json`）に信頼を書き込むことはしない（非公開の形式で、壊すおそれがあるため）。
+指揮役の居場所はリポジトリではないので、`spawn` は `~/.cuse` の中では配下を起こさない。
 
 `claude` の失敗の理由は標準エラーから取る（`toCommandError`）。execFile の `Command failed: <コマンド全体>` には
 指揮役のトークンや心得の全文が入るので、画面やログにそのまま出さない。

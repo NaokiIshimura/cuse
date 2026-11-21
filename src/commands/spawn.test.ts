@@ -81,6 +81,16 @@ describe('runSpawn', () => {
     expect(bgCalls(world)[0]?.cwd).toBe('/Users/example/other');
   });
 
+  it('指揮役の居場所（~/.cuse）では配下を起こさない（--cwd を求める）', async () => {
+    const world = leaderWorld({ cwd: '/Users/example/.cuse/leader' });
+    const outcome = await runSpawn({ task: 't', name: 'tests' }, world.deps);
+    expect(outcome).toMatchObject({ ok: false, error: { kind: 'usage' } });
+    expect(!outcome.ok && outcome.error.message).toContain('--cwd');
+    expect(bgCalls(world)).toEqual([]);
+    const withCwd = await runSpawn({ task: 't', name: 'tests', cwd: '/Users/example/work/app' }, world.deps);
+    expect(withCwd.ok).toBe(true);
+  });
+
   it('git リポジトリでなければ警告を返す（起動はする）', async () => {
     const world = leaderWorld();
     world.nonRepositories.add('/Users/example/project');

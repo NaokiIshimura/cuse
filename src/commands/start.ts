@@ -14,6 +14,7 @@ import {
   type BackgroundLaunch,
 } from '../core/claudeBg.js';
 import type { LedgerLeader } from '../core/ledger.js';
+import { buildLeaderHome } from '../core/paths.js';
 import { createLeaderToken, hashLeaderToken, LEADER_TOKEN_ENV } from '../core/leaderToken.js';
 import type { Agent } from '../types/agent.js';
 import { listAgents, loadLedger, saveLedger, type OpsDeps } from './deps.js';
@@ -81,10 +82,25 @@ export const launchFailure = (message: string, cwd: string, home: string): Comma
     const where =
       cwd === home
         ? 'ホームフォルダでは指揮役を起こせません（Claude Code がホームフォルダを信頼するのは 1 度に 1 セッションだけのため）。作業するリポジトリなど、別のフォルダを選んでください。'
-        : `フォルダ ${cwd} を Claude Code がまだ信頼していません。端末でそのフォルダに移って claude を一度起動し、信頼してから、もう一度試してください。`;
-    return { kind: 'untrusted', message: `${where}（Claude Code: ${message}）` };
+        : cwd === buildLeaderHome(home)
+          ? `初回だけ、指揮役の居場所 ${cwd} を Claude Code で信頼してください。ウィンドウでは中央に出る Claude Code の確認で、端末では cd ${cwd} && claude を一度実行して信頼してから、もう一度起こします。`
+          : `フォルダ ${cwd} を Claude Code がまだ信頼していません。端末でそのフォルダに移って claude を一度起動し、信頼してから、もう一度試してください。`;
+    return { kind: 'untrusted', message: `${where}（Claude Code: ${message}）`, folder: cwd };
   }
   return { kind: 'launch', message: `指揮役を起こせませんでした: ${message}` };
+};
+
+/**
+ * 新しく起こす指揮役の置き場所。
+ *
+ * 指定があればそれ。無ければ呼び出し元のディレクトリだが、そこがホームか `/`（Finder から開いた .app）なら、
+ * 指揮役の居場所 `~/.cuse/leader` にする（ホームは Claude Code が指揮役に使わせないため）。
+ */
+export const newLeaderCwd = (input: string | undefined, cwd: string, home: string): string => {
+  if (input !== undefined) {
+    return isAbsolute(input) ? input : resolve(cwd, input);
+  }
+  return cwd === '' || cwd === '/' || cwd === home ? buildLeaderHome(home) : cwd;
 };
 
 const findLeaderAgent = (agents: readonly Agent[], leader: LedgerLeader): Agent | undefined =>
@@ -163,11 +179,10 @@ export const runStart = async (input: StartInput, deps: OpsDeps): Promise<Outcom
   const resuming = current !== null && input.new !== true;
   const cwd = resuming
     ? current.cwd === '' ? deps.cwd : current.cwd
-    : input.cwd === undefined
-      ? deps.cwd
-      : isAbsolute(input.cwd)
-        ? input.cwd
-        : resolve(deps.cwd, input.cwd);
+    : newLeaderCwd(input.cwd, deps.cwd, deps.home);
+  if (cwd === buildLeaderHome(deps.home)) {
+    await deps.makeDirectory(cwd);
+  }
   const permissionMode = input.permissionMode ?? (resuming ? current.permissionMode : null);
 
   // 起動・再開のたびにトークンを作り直す（古いトークンを持つプロセスを指揮役とみなさない）

@@ -27,6 +27,8 @@ export interface OpsDeps {
   readonly readBundled: (relativePath: string) => Promise<string>;
   /** cuse スキルを置く場所の読み書き */
   readonly skillFs: SkillFileSystem;
+  /** ディレクトリを作る（無ければ。指揮役の居場所 `~/.cuse/leader` に使う） */
+  readonly makeDirectory: (path: string) => Promise<void>;
 }
 
 /** 途中の段階の結果。失敗ならそのまま返せる Outcome を持つ。 */

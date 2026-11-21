@@ -72,6 +72,7 @@ const makeBridge = (snapshot: Snapshot) => {
   const stopped: [string, string][] = [];
   let ensured = 0;
   let chosen = 0;
+  const trusted: { tabId: string }[] = [];
   const bridge: CuseBridge = {
     getEnvironment: async () => environment,
     getSnapshot: async () => snapshot,
@@ -98,8 +99,12 @@ const makeBridge = (snapshot: Snapshot) => {
       chosen += 1;
       return { kind: 'starting' };
     },
+    openTrustTerminal: async (request) => {
+      trusted.push({ tabId: request.tabId });
+      return { ok: true };
+    },
   };
-  return { bridge, opened, closed, stopped, ensured: () => ensured, chosen: () => chosen };
+  return { bridge, opened, closed, stopped, trusted, ensured: () => ensured, chosen: () => chosen };
 };
 
 beforeEach(() => {
@@ -185,7 +190,7 @@ describe('App', () => {
   it('指揮役を起こせなければ理由を出し、もう一度頼める', async () => {
     const { bridge, ensured } = makeBridge({
       ...missingSnapshot,
-      leaderStartup: { kind: 'failed', message: 'Claude Code v2.1.200 は古いです', untrusted: false },
+      leaderStartup: { kind: 'failed', message: 'Claude Code v2.1.200 は古いです', untrustedFolder: null },
     });
     const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
     await flush();
@@ -195,26 +200,31 @@ describe('App', () => {
     expect(ensured()).toBe(1);
   });
 
-  it('置き場所が決まっていなければ、フォルダを選んでもらう', async () => {
-    const { bridge, chosen } = makeBridge({ ...missingSnapshot, leaderStartup: { kind: 'needs-folder' } });
-    const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
-    await flush();
-    expect(container.textContent).toContain('指揮役を起こすフォルダを選んでください');
-    expect(container.textContent).toContain('ホームフォルダ');
-    fireEvent.click(getByText('フォルダを選ぶ'));
-    expect(chosen()).toBe(1);
-  });
-
-  it('信頼されていないフォルダで起こせなければ、「もう一度」ではなくフォルダを選び直してもらう', async () => {
-    const { bridge, chosen } = makeBridge({
+  it('初回は指揮役の居場所で動かした Claude Code を出し、信頼してから起こしてもらう', async () => {
+    const { bridge, trusted, closed, ensured, chosen } = makeBridge({
       ...missingSnapshot,
-      leaderStartup: { kind: 'failed', message: 'ホームフォルダでは指揮役を起こせません', untrusted: true },
+      leaderStartup: {
+        kind: 'failed',
+        message: '初回だけ信頼してください',
+        untrustedFolder: '/Users/example/.cuse/leader',
+      },
     });
-    const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
+    const { container, getByText, unmount } = render(<App environment={environment} bridge={bridge} />);
     await flush();
-    expect(container.textContent).not.toContain('もう一度');
-    fireEvent.click(getByText('フォルダを選び直す'));
+    await flush();
+    expect(container.textContent).toContain('初回だけ: 指揮役の居場所を Claude Code で信頼してください');
+    expect(container.textContent).toContain('/Users/example/.cuse/leader');
+    // どのフォルダで動かすかは main が決める（renderer はタブの ID と大きさだけを渡す）
+    expect(trusted).toEqual([{ tabId: 'trust' }]);
+
+    fireEvent.click(getByText('指揮役を起こす'));
+    expect(ensured()).toBe(1);
+    fireEvent.click(getByText('別のフォルダで起こす'));
     expect(chosen()).toBe(1);
+
+    // 信頼の端末は閉じるときに切る
+    unmount();
+    expect(closed).toContain('trust');
   });
 
   it('指揮役を起こしたときの警告を上端に出す', async () => {

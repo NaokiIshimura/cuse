@@ -108,18 +108,43 @@ describe('runStart', () => {
     expect(bgCalls(w)).toEqual([]);
   });
 
-  it('信頼されていないフォルダ（ホームなど）では、次にすることを伝える。トークンや心得は出さない', async () => {
+  it('ホームや Finder から（/）なら、指揮役の居場所 ~/.cuse/leader を作ってそこで起こす', async () => {
+    for (const cwd of ['/Users/example', '/']) {
+      const w = createFakeWorld({ cwd });
+      const outcome = await runStart({}, w.deps);
+      expect(outcome.ok && outcome.value.leader.cwd).toBe('/Users/example/.cuse/leader');
+      expect(w.directories).toEqual(new Set(['/Users/example/.cuse/leader']));
+      expect(bgCalls(w)[0]?.cwd).toBe('/Users/example/.cuse/leader');
+    }
+  });
+
+  it('--cwd を渡せばそこで起こす（居場所は作らない）', async () => {
     const w = createFakeWorld({ cwd: '/Users/example' });
-    w.untrusted.add('/Users/example');
+    const outcome = await runStart({ cwd: 'work/app' }, w.deps);
+    expect(outcome.ok && outcome.value.leader.cwd).toBe('/Users/example/work/app');
+    expect(w.directories.size).toBe(0);
+  });
+
+  it('居場所がまだ信頼されていなければ、初回だけ信頼するよう伝える。トークンや心得は出さない', async () => {
+    const w = createFakeWorld({ cwd: '/Users/example' });
+    w.untrusted.add('/Users/example/.cuse/leader');
     const outcome = await runStart({}, w.deps);
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
-    expect(outcome.error.kind).toBe('untrusted');
-    expect(outcome.error.message).toContain('ホームフォルダでは指揮役を起こせません');
+    expect(outcome.error).toMatchObject({ kind: 'untrusted', folder: '/Users/example/.cuse/leader' });
+    expect(outcome.error.message).toContain('初回だけ');
+    expect(outcome.error.message).toContain('cd /Users/example/.cuse/leader && claude');
     expect(outcome.error.message).toContain('Workspace not trusted');
     expect(outcome.error.message).not.toContain('CUSE_LEADER_TOKEN');
     expect(outcome.error.message).not.toContain('心得');
     expect(w.ledger.leader).toBeNull();
+  });
+
+  it('ホームを --cwd で指定して断られたら、別のフォルダを選ぶよう伝える', async () => {
+    const w = createFakeWorld({ cwd: '/Users/example/repo' });
+    w.untrusted.add('/Users/example');
+    const outcome = await runStart({ cwd: '/Users/example' }, w.deps);
+    expect(!outcome.ok && outcome.error.message).toContain('ホームフォルダでは指揮役を起こせません');
   });
 
   it('ホーム以外の信頼されていないフォルダでは、信頼のしかたを伝える', async () => {
