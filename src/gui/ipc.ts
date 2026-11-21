@@ -47,7 +47,14 @@ export const IPC_CHANNELS = {
   readPreview: 'preview:read',
   /** セッションに出てきた URL を普段のブラウザで開く */
   openExternalUrl: 'preview:openExternal',
+  /** 埋め込み端末で押されたファイル名・URL をプレビューに足す（セッションに出てきたものだけ） */
+  openPreviewLink: 'preview:openLink',
 } as const;
+
+/** 端末で押されたものをプレビューに足した結果。`key` はプレビューで開くときの鍵（previewKey）。 */
+export type OpenPreviewLinkResult =
+  | { readonly ok: true; readonly key: string }
+  | { readonly ok: false; readonly message: string };
 
 /** 起動時に 1 回だけ取る環境。 */
 export interface GuiEnvironment {
@@ -131,6 +138,11 @@ export interface CuseBridge {
   readonly readPreview: (sessionId: string, key: string, reveal: boolean) => Promise<PreviewResult>;
   /** セッションに出てきた URL を普段のブラウザで開く。出てきていない URL は開かない */
   readonly openExternalUrl: (sessionId: string, url: string) => Promise<boolean>;
+  /**
+   * 埋め込み端末で押されたファイル名・URL を、そのセッションのプレビューに足す。
+   * main がそのセッションの transcript に出てきたものか・ファイルがあるかを確かめる
+   */
+  readonly openPreviewLink: (sessionId: string, text: string, kind: 'url' | 'file') => Promise<OpenPreviewLinkResult>;
   /** 通知を押したときに開くセッションを受け取る。購読を解除する関数を返す */
   readonly onOpenSession: (listener: (sessionId: string) => void) => () => void;
   readonly openTrustTerminal: (

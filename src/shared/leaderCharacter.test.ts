@@ -45,11 +45,16 @@ describe('getLeaderFrame', () => {
   });
 
   it.each<CharacterState>(['waiting', 'done', 'blocked', 'justFinished', 'stopped', 'unknown'])(
-    '%s は配下と同じ Clawd に指揮棒を足しただけ',
+    '%s はふだん指揮棒を上げている。ほかは配下と同じ Clawd（承認待ちに右手で呼ぶ、など）',
     (state) => {
       for (let frame = 0; frame < 4; frame += 1) {
-        const leader = getLeaderFrame(state, frame).split('\n').map((row) => [...row].slice(0, CHARACTER_WIDTH).join(''));
-        expect(leader.join('\n')).toBe(getFrame(state, frame));
+        const rows = getLeaderFrame(state, frame).split('\n').map((row) => [...row]);
+        expect(rows[0]?.slice(CHARACTER_WIDTH - 1)).toEqual(['▗', '▞']);
+        const worker = getFrame(state, frame).split('\n').map((row) => [...row]);
+        // 左手（頭の行の桁 8）と指揮棒の桁を除けば、配下と同じ
+        expect(rows.map((row, index) => row.slice(0, index === 0 ? CHARACTER_WIDTH - 1 : CHARACTER_WIDTH).join(''))).toEqual(
+          worker.map((row, index) => row.slice(0, index === 0 ? CHARACTER_WIDTH - 1 : CHARACTER_WIDTH).join('')),
+        );
       }
     },
   );

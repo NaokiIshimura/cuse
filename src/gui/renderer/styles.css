@@ -1230,3 +1230,14 @@ button {
 .character__baton {
   color: var(--ink-white);
 }
+
+/* 会話の中で押したものを開けなかったときの知らせ */
+.preview__notice {
+  margin: 0 12px 8px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--ink-yellow) 40%, transparent);
+  border-radius: 4px;
+  color: var(--ink-yellow);
+  font-size: 12px;
+  line-height: 1.5;
+}

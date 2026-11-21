@@ -129,7 +129,7 @@ npm で入れた node-pty は `prebuilds/darwin-*/spawn-helper` の実行権限�
 そのままだと端末が起きずに真っ暗になる。`gui:package` で `chmod +x` してから組み、main も端末を起こす前に
 `ensureSpawnHelperExecutable`（`src/core/ptyHelper.ts`）で確かめる。端末を起こせなかった理由は必ず画面に出す。
 
-右のプレビューは、transcript から拾ったもの（`src/shared/previewItems.ts`）だけを開く。renderer は鍵（`previewKey`）を渡すだけで、
+右のプレビューは、transcript から拾ったもの（`src/shared/previewItems.ts`）と、中央の端末で押したファイル名・URL（`src/shared/terminalLinks.ts` で探し、main の `src/gui/previewLinks.ts` が transcript に出てきた文字列か・ファイルがあるかを確かめたもの）だけを開く。renderer は鍵（`previewKey`）を渡すだけで、
 main が読むたびに transcript を読み直して、そのセッションに出てきたものかを確かめる（任意のファイルを読ませない）。
 Web 表示は `<webview>` を `will-attach-webview` で隔離する（Node 連携なし・preload なし・`cuse-preview` の専用セッション領域・http(s) のみ・新しいウィンドウは開かない）。
 

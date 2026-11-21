@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -9,6 +10,8 @@ import { runKill } from '../commands/kill.js';
 import { approvalNotices } from '../shared/approvalNotices.js';
 import { extractPreviewItems, previewKey, type PreviewItem } from '../shared/previewItems.js';
 import { buildTranscriptPath } from '../shared/transcriptPath.js';
+import { findLastCwd } from '../shared/parseTranscript.js';
+import { resolveTerminalLink } from './previewLinks.js';
 import { readPreviewContent } from '../core/previewContent.js';
 import { readTail } from '../core/readOutput.js';
 import { execFileRunner } from '../core/runCommand.js';
@@ -28,6 +31,7 @@ import {
   type GuiEnvironment,
   type OpenTerminalRequest,
   type OpenTerminalResult,
+  type OpenPreviewLinkResult,
   type CleanWorkersResult,
   type OpenTrustTerminalRequest,
   type PreviewResult,
@@ -194,31 +198,75 @@ const notifyApprovals = (agents: readonly Agent[], ledger: Ledger | null): void 
 /** プレビューのために transcript の末尾から読む量。古いものまで拾いすぎないよう、表示の 512KB と同じにする。 */
 const PREVIEW_TRANSCRIPT_BYTES = 512 * 1024;
 
-/**
- * セッションに出てきたファイル・URL。
- * セッションの作業ディレクトリ（transcript の置き場所を決める）は、一覧か台帳から引く。
- */
-const previewItemsOf = async (sessionId: string): Promise<PreviewItem[]> => {
+/** そのセッションの作業ディレクトリ（transcript の置き場所を決める）。一覧か台帳から引く。 */
+const sessionCwdOf = async (sessionId: string): Promise<string | undefined> => {
+  const listed = lastAgents?.find((agent) => agent.sessionId === sessionId)?.cwd;
+  if (listed !== undefined) {
+    return listed;
+  }
+  const ledger = await readLedger({ home });
+  if (ledger.kind !== 'ok') {
+    return undefined;
+  }
+  return ledger.ledger.leader?.sessionId === sessionId
+    ? ledger.ledger.leader.cwd
+    : ledger.ledger.workers.find((worker) => worker.sessionId === sessionId)?.cwd;
+};
+
+/** そのセッションの transcript の末尾。読めなければ ''。 */
+const transcriptChunkOf = async (sessionId: string): Promise<{ readonly chunk: string; readonly cwd: string | null }> => {
   if (typeof sessionId !== 'string' || sessionId === '') {
-    return [];
+    return { chunk: '', cwd: null };
   }
-  let cwd = lastAgents?.find((agent) => agent.sessionId === sessionId)?.cwd;
-  if (cwd === undefined) {
-    const ledger = await readLedger({ home });
-    if (ledger.kind === 'ok') {
-      cwd =
-        ledger.ledger.leader?.sessionId === sessionId
-          ? ledger.ledger.leader.cwd
-          : ledger.ledger.workers.find((worker) => worker.sessionId === sessionId)?.cwd;
-    }
-  }
+  const cwd = await sessionCwdOf(sessionId);
   const path = cwd === undefined ? null : buildTranscriptPath(home, cwd, sessionId);
   if (path === null) {
-    return [];
+    return { chunk: '', cwd: cwd ?? null };
   }
   const chunk = await readTail(path, PREVIEW_TRANSCRIPT_BYTES).catch(() => '');
-  return extractPreviewItems(chunk);
+  // 相対パスは、セッションがいま作業している場所（worktree へ移った後の場所）から読む
+  return { chunk, cwd: findLastCwd(chunk) ?? cwd ?? null };
 };
+
+/**
+ * 端末で押されて足したもの（セッションごと）。transcript から拾えるものに加えてプレビューに出す。
+ * 足すときに main が確かめたものだけが入る。
+ */
+const clickedItems = new Map<string, PreviewItem[]>();
+const CLICKED_LIMIT = 20;
+
+/** セッションに出てきたファイル・URL（transcript から拾ったものと、端末で押して足したもの）。 */
+const previewItemsOf = async (sessionId: string): Promise<PreviewItem[]> => {
+  const { chunk } = await transcriptChunkOf(sessionId);
+  const extracted = extractPreviewItems(chunk);
+  const keys = new Set(extracted.map(previewKey));
+  const clicked = (clickedItems.get(sessionId) ?? []).filter((item) => !keys.has(previewKey(item)));
+  return [...clicked, ...extracted];
+};
+
+ipcMain.handle(
+  IPC_CHANNELS.openPreviewLink,
+  async (_event, sessionId: unknown, text: unknown, kind: unknown): Promise<OpenPreviewLinkResult> => {
+    if (typeof sessionId !== 'string' || typeof text !== 'string' || (kind !== 'url' && kind !== 'file')) {
+      return { ok: false, message: '開くものが分かりません。' };
+    }
+    const { chunk, cwd } = await transcriptChunkOf(sessionId);
+    const resolved = await resolveTerminalLink(text, kind, {
+      chunk,
+      cwd,
+      home,
+      now: Date.now(),
+      isFile: (path) => stat(path).then((stats) => stats.isFile(), () => false),
+    });
+    if (!resolved.ok) {
+      return resolved;
+    }
+    const key = previewKey(resolved.item);
+    const current = (clickedItems.get(sessionId) ?? []).filter((item) => previewKey(item) !== key);
+    clickedItems.set(sessionId, [resolved.item, ...current].slice(0, CLICKED_LIMIT));
+    return { ok: true, key };
+  },
+);
 
 ipcMain.handle(IPC_CHANNELS.getPreviewItems, (_event, sessionId: unknown) =>
   previewItemsOf(typeof sessionId === 'string' ? sessionId : ''),

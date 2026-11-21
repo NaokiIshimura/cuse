@@ -2,6 +2,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { findTerminalLinks, type TerminalLink } from '../../../../shared/terminalLinks.js';
 import type { CuseBridge } from '../../../ipc.js';
 
 interface TerminalViewProps {
@@ -14,7 +15,35 @@ interface TerminalViewProps {
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
   /** 表に出ているタブか。隠れている間も会話の続きを受け取るため、閉じずに残す */
   readonly active: boolean;
+  /** 画面のファイル名・URL が押されたとき（右のプレビューに出す）。無ければ押せるようにしない */
+  readonly onLink?: ((link: Pick<TerminalLink, 'text' | 'kind'>) => void) | undefined;
 }
+
+/**
+ * 端末の 1 行を文字列にし、文字列の位置 → 桁（1 始まり）の対応を作る。
+ * 日本語などの全角は 2 桁を使うので、文字列の位置と桁はずれる。
+ */
+const lineText = (term: Terminal, y: number): { readonly text: string; readonly columns: readonly number[] } | null => {
+  const line = term.buffer.active.getLine(y - 1);
+  if (line === undefined) {
+    return null;
+  }
+  let text = '';
+  const columns: number[] = [];
+  for (let x = 0; x < line.length; x += 1) {
+    const cell = line.getCell(x);
+    // 全角の 2 桁目（幅 0）は飛ばす
+    if (cell === undefined || cell.getWidth() === 0) {
+      continue;
+    }
+    const chars = cell.getChars() === '' ? ' ' : cell.getChars();
+    for (let unit = 0; unit < chars.length; unit += 1) {
+      text += chars[unit];
+      columns.push(x + 1);
+    }
+  }
+  return { text, columns };
+};
 
 type Connection =
   | { readonly kind: 'connecting' }
@@ -27,8 +56,11 @@ type Connection =
  * cuse 独自の入力欄は作らない。人はこの中で Claude Code に直接打ち込み、配下の承認もここで行う
  * （cuse が承認するのではなく、人が Claude Code の画面で承認する）。
  */
-export const TerminalView = ({ bridge, tabId, open, active }: TerminalViewProps) => {
+export const TerminalView = ({ bridge, tabId, open, active, onLink }: TerminalViewProps) => {
   const container = useRef<HTMLDivElement | null>(null);
+  // 端末を作り直さずに最新の onLink を呼べるよう、ref に入れておく
+  const onLinkRef = useRef(onLink);
+  onLinkRef.current = onLink;
   const terminal = useRef<Terminal | null>(null);
   const fit = useRef<FitAddon | null>(null);
   const [connection, setConnection] = useState<Connection>({ kind: 'connecting' });
@@ -66,6 +98,31 @@ export const TerminalView = ({ bridge, tabId, open, active }: TerminalViewProps)
     terminal.current = term;
     fit.current = fitAddon;
 
+    // 画面のファイル名・URL を押せるようにする（下線と指のカーソル）。開くかどうかは main が確かめる
+    const links = term.registerLinkProvider({
+      provideLinks: (y, callback) => {
+        const line = onLinkRef.current === undefined ? null : lineText(term, y);
+        const found = line === null ? [] : findTerminalLinks(line.text);
+        if (line === null || found.length === 0) {
+          callback(undefined);
+          return;
+        }
+        callback(
+          found.map((link) => ({
+            range: {
+              start: { x: line.columns[link.start] ?? 1, y },
+              end: { x: line.columns[link.end - 1] ?? 1, y },
+            },
+            text: link.text,
+            decorations: { underline: true, pointerCursor: true },
+            activate: () => {
+              onLinkRef.current?.({ text: link.text, kind: link.kind });
+            },
+          })),
+        );
+      },
+    });
+
     const input = term.onData((data) => {
       bridge.writeTerminal(tabId, data);
     });
@@ -95,6 +152,7 @@ export const TerminalView = ({ bridge, tabId, open, active }: TerminalViewProps)
 
     return () => {
       observer.disconnect();
+      links.dispose();
       input.dispose();
       resize.dispose();
       offData();

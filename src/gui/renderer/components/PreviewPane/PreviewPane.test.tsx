@@ -145,4 +145,38 @@ describe('PreviewPane', () => {
     );
     expect(container.textContent).toContain('中央でセッションを開くと');
   });
+
+  it('会話の中で押したものを開く。開けなければ理由を出す', async () => {
+    const { bridge, reads } = makeBridge(items, results);
+    const { container, rerender } = render(
+      <PreviewPane bridge={bridge} sessionId="s1" sessionName="tests" following={false} onToggleFollow={() => undefined} />,
+    );
+    await flush();
+    rerender(
+      <PreviewPane
+        bridge={bridge}
+        sessionId="s1"
+        sessionName="tests"
+        following={false}
+        onToggleFollow={() => undefined}
+        request={{ nonce: 1, key: 'url:http://localhost:5173/' }}
+      />,
+    );
+    await flush();
+    expect(reads.at(-1)).toEqual(['s1', 'url:http://localhost:5173/', false]);
+    expect(container.querySelector('webview')?.getAttribute('src')).toBe('http://localhost:5173/');
+
+    rerender(
+      <PreviewPane
+        bridge={bridge}
+        sessionId="s1"
+        sessionName="tests"
+        following={false}
+        onToggleFollow={() => undefined}
+        request={{ nonce: 2, message: '/etc/passwd はこのセッションに出てきたものではないので開きません。' }}
+      />,
+    );
+    await flush();
+    expect(container.querySelector('.preview__notice')?.textContent).toContain('出てきたものではない');
+  });
 });
