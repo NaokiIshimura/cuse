@@ -28,6 +28,7 @@ const ledger: ReadLedgerResult = {
       endedAt: null,
       endReason: null,
       promptCount: 0,
+      cleanedAt: null,
     })),
   },
 };

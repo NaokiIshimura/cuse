@@ -32,6 +32,7 @@ describe('updateLedger（本物のファイル）', () => {
                 endedAt: null,
                 endReason: null,
                 promptCount: 0,
+                cleanedAt: null,
               },
             ],
           }),

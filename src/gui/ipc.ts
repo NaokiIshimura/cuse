@@ -35,6 +35,10 @@ export const IPC_CHANNELS = {
   chooseLeaderFolder: 'leader:chooseFolder',
   /** 指揮役の居場所を信頼してもらうため、そのフォルダで claude を動かす（初回だけ） */
   openTrustTerminal: 'terminal:openTrust',
+  /** 人が終わった配下を片付ける（台帳の配下だけ。未 commit / 未 push は残す） */
+  cleanWorkers: 'workers:clean',
+  /** 通知を押したときに、そのセッションを開いてもらう（main → renderer） */
+  openSession: 'session:open',
 } as const;
 
 /** 起動時に 1 回だけ取る環境。 */
@@ -79,6 +83,10 @@ export type OpenTerminalResult =
     }
   | { readonly ok: false; readonly message: string };
 
+export type CleanWorkersResult =
+  | { readonly ok: true; readonly message: string; readonly cleaned: number }
+  | { readonly ok: false; readonly message: string };
+
 export type StopWorkerResult = { readonly ok: true; readonly message: string } | { readonly ok: false; readonly message: string };
 
 /** preload が `window.cuse` として公開する API。 */
@@ -100,6 +108,9 @@ export interface CuseBridge {
    * 指揮役を起こせなかった理由が「フォルダを信頼していない」とき、そのフォルダで claude を動かす。
    * どのフォルダかは main が決める（renderer からフォルダは渡さない）
    */
+  readonly cleanWorkers: () => Promise<CleanWorkersResult>;
+  /** 通知を押したときに開くセッションを受け取る。購読を解除する関数を返す */
+  readonly onOpenSession: (listener: (sessionId: string) => void) => () => void;
   readonly openTrustTerminal: (
     request: OpenTrustTerminalRequest,
   ) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;

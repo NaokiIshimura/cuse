@@ -42,6 +42,7 @@ export const App = ({ environment, bridge }: AppProps) => {
   const [openedTabs, setOpenedTabs] = useState<readonly TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [stopping, setStopping] = useState<Agent | null>(null);
+  const [cleanMessage, setCleanMessage] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
   const frame = useAnimationTick(ANIMATION_INTERVAL_MS, !reducedMotion);
 
@@ -123,6 +124,25 @@ export const App = ({ environment, bridge }: AppProps) => {
     [leaderRecord, model.workerIds],
   );
 
+  // OS 通知を押したら、その配下（または指揮役）を中央に開く
+  useEffect(
+    () =>
+      bridge.onOpenSession((sessionId) => {
+        const agent = agents.find((candidate) => candidate.sessionId === sessionId);
+        if (agent !== undefined) {
+          openAgent(agent);
+        }
+      }),
+    [bridge, agents, openAgent],
+  );
+
+  const clean = useCallback(() => {
+    setCleanMessage('片付けています…');
+    void bridge.cleanWorkers().then((result) => {
+      setCleanMessage(result.message);
+    });
+  }, [bridge]);
+
   const closeTab = useCallback((tabId: string) => {
     setOpenedTabs((current) => current.filter((tab) => tab.tabId !== tabId));
     setActiveTabId((current) => (current === tabId ? null : current));
@@ -158,6 +178,8 @@ export const App = ({ environment, bridge }: AppProps) => {
             workerIds={model.workerIds}
             onOpen={openAgent}
             onStop={setStopping}
+            onClean={clean}
+            cleanMessage={cleanMessage}
           />
         )}
         <CenterPane

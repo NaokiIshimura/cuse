@@ -127,6 +127,14 @@
           "promptCount": {
             "type": "integer",
             "minimum": 0
+          },
+          "cleanedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "cuse clean で片付けた時刻"
           }
         }
       }

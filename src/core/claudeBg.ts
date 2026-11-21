@@ -202,3 +202,23 @@ export const findByShortId = async (
 
 /** プロセスが生きているか。`claude agents --json` は生きている間だけ pid を出す。 */
 export const isAlive = (agent: Pick<Agent, 'pid'>): boolean => agent.pid !== undefined;
+
+/**
+ * `claude rm <短縮 ID>`。セッションを一覧から外す。Claude が作った worktree は、消してよいときだけ Claude が消す。
+ * cuse は呼ぶ前に、commit していない変更や push していない commit が無いことを確かめる（`cuse clean`）。
+ */
+export const removeSession = async (
+  shortId: string,
+  options: RunOptions = {},
+): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> => {
+  const runner = options.runner ?? execFileRunner;
+  try {
+    await runner(options.command ?? 'claude', ['rm', shortId], {
+      timeoutMs: options.timeoutMs ?? 30_000,
+      signal: undefined,
+    });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: toCommandError(error, 'claude rm がタイムアウトしました。').message };
+  }
+};

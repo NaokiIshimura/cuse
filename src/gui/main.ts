@@ -2,15 +2,18 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, dialog, ipcMain, shell, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell, type WebContents } from 'electron';
 import { spawn as spawnPty } from 'node-pty';
+import { runClean } from '../commands/clean.js';
 import { runKill } from '../commands/kill.js';
+import { approvalNotices } from '../shared/approvalNotices.js';
+import type { Agent } from '../types/agent.js';
 import { runStart } from '../commands/start.js';
 import { MAX_WORKERS } from '../config/defaults.js';
 import { createAgentsObserver } from '../core/agentsDebug.js';
 import { checkClaudeVersion, type ClaudeVersionCheck } from '../core/claudeVersion.js';
 import { fetchAgents } from '../core/fetchAgents.js';
-import { readLedger } from '../core/ledger.js';
+import { readLedger, type Ledger } from '../core/ledger.js';
 import { withoutLeaderToken } from '../core/leaderToken.js';
 import { resolveShellPath } from '../core/shellPath.js';
 import { defaultDeps } from '../runCli.js';
@@ -20,6 +23,7 @@ import {
   type GuiEnvironment,
   type OpenTerminalRequest,
   type OpenTerminalResult,
+  type CleanWorkersResult,
   type OpenTrustTerminalRequest,
   type Snapshot,
   type StopWorkerResult,
@@ -139,7 +143,54 @@ ipcMain.handle(IPC_CHANNELS.getSnapshot, async (): Promise<Snapshot> => {
     fetchAgents({ all: true, meta: true, home, observe: observeAgents }),
     readLedger({ home }),
   ]);
+  if (agents.ok) {
+    notifyApprovals(agents.agents, ledger.kind === 'ok' ? ledger.ledger : null);
+  }
   return { agents, ledger, leaderStartup: leaderStartup.status(), at: Date.now() };
+});
+
+/** 前回の一覧。承認待ちになったかを知るため。 */
+let lastAgents: readonly Agent[] | null = null;
+
+/**
+ * 配下・指揮役が承認待ちになったら OS 通知を出す。ウィンドウを見ている間は出さない（画面で分かるため）。
+ * 通知を押すとウィンドウを前に出し、その配下を中央に開く。
+ */
+const notifyApprovals = (agents: readonly Agent[], ledger: Ledger | null): void => {
+  const watched = new Set([
+    ...(ledger?.workers.map((worker) => worker.sessionId) ?? []),
+    ...(ledger?.leader === null || ledger?.leader === undefined ? [] : [ledger.leader.sessionId]),
+  ]);
+  const notices = approvalNotices(lastAgents, agents, watched, Date.now());
+  lastAgents = agents;
+  const [window] = BrowserWindow.getAllWindows();
+  if (notices.length === 0 || !Notification.isSupported() || window?.isFocused() === true) {
+    return;
+  }
+  for (const notice of notices) {
+    const notification = new Notification({ title: notice.title, body: notice.body });
+    notification.on('click', () => {
+      const target = BrowserWindow.getAllWindows()[0];
+      if (target === undefined) {
+        return;
+      }
+      if (target.isMinimized()) {
+        target.restore();
+      }
+      target.show();
+      target.focus();
+      target.webContents.send(IPC_CHANNELS.openSession, notice.sessionId);
+    });
+    notification.show();
+  }
+};
+
+/** 人が終わった配下を片付ける。トークンは要らないが、台帳の配下だけ・未 commit / 未 push は残す（runClean）。 */
+ipcMain.handle(IPC_CHANNELS.cleanWorkers, async (): Promise<CleanWorkersResult> => {
+  const outcome = await runClean({ byHuman: true }, defaultDeps());
+  return outcome.ok
+    ? { ok: true, message: outcome.text, cleaned: outcome.value.cleaned.length }
+    : { ok: false, message: outcome.error.message };
 });
 
 /** 出力を送る先のウィンドウ。閉じたあとは送らない。 */

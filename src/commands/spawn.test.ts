@@ -43,6 +43,7 @@ describe('runSpawn', () => {
         endedAt: null,
         endReason: null,
         promptCount: 0,
+        cleanedAt: null,
       },
     ]);
   });

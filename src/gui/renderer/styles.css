@@ -324,8 +324,15 @@ button {
   gap: 2px 6px;
 }
 
-.worker-list__done-title {
+.worker-list__done-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: 20px 4px 8px;
+}
+
+.worker-list__done-title {
+  margin: 0;
   font-size: 12px;
   letter-spacing: 0.12em;
   color: var(--fg-muted);
@@ -789,4 +796,17 @@ button {
   color: var(--ink-yellow);
   font-size: 12px;
   font-weight: 700;
+}
+
+.link-button--small {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.worker-list__clean-message {
+  margin: 0 4px 8px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }

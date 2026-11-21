@@ -588,3 +588,29 @@ export const findLastAssistantText = (chunk: string): string | undefined => {
 
   return lastText;
 };
+
+/**
+ * transcript の断片から、最後に記録された作業ディレクトリ（`cwd`）を取り出す。cuse で足したもの。
+ *
+ * background セッションは、ファイルを書き換える前に `.claude/worktrees/` の下の worktree へ移る。
+ * `claude agents --json` の `cwd` は起動したディレクトリのままなので、いまどこで作業しているかは
+ * transcript の各行にある `cwd` の最後の値で知る（`cuse review` / `clean` が差分を見る場所）。
+ */
+export const findLastCwd = (chunk: string): string | undefined => {
+  let last: string | undefined;
+  for (const line of chunk.split('\n')) {
+    if (line.trim() === '') {
+      continue;
+    }
+    try {
+      const entry = JSON.parse(line) as { readonly cwd?: unknown; readonly isSidechain?: unknown };
+      // サブエージェントの行は、親と別の場所で動いていることがあるので見ない
+      if (typeof entry?.cwd === 'string' && entry.cwd !== '' && entry.isSidechain !== true) {
+        last = entry.cwd;
+      }
+    } catch {
+      // 壊れた行は読み飛ばす
+    }
+  }
+  return last;
+};

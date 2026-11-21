@@ -21,11 +21,13 @@ const cli = meow(
     agents                  配下の状態・待っているもの・最後の指示・コンテキスト使用率
     output <名前>           最後の報告と claude logs の末尾
     wait <名前…>            誰かが手を止めるまで待ち、誰が何のために止まったかを返す
+    review <名前>           作業した場所・ブランチ・差分・未 commit / 未 push・PR・最後の報告
 
   指揮役だけが使うコマンド
     spawn "<タスク>" <名前> 配下を起動して台帳に記録する（同時に ${MAX_WORKERS} つまで）
     prompt <名前> "<指示>"  止まった配下に続きを頼む（動いていれば SendMessage で送るよう返す）
     kill <名前>             配下を止め、理由を台帳に残す（--reason 必須）
+    clean                   終わった配下を片付ける（未 commit / 未 push があれば残す）
 
   オプション
     --json                  結果を JSON で出す。失敗は {"error":{"kind","message"}} と終了コード 1

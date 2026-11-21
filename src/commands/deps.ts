@@ -29,6 +29,8 @@ export interface OpsDeps {
   readonly skillFs: SkillFileSystem;
   /** ディレクトリを作る（無ければ。指揮役の居場所 `~/.cuse/leader` に使う） */
   readonly makeDirectory: (path: string) => Promise<void>;
+  /** セッションの transcript の末尾を読む（作業ディレクトリと最後の報告を知るため）。読めなければ null */
+  readonly readTranscript: (cwd: string, sessionId: string) => Promise<string | null>;
 }
 
 /** 途中の段階の結果。失敗ならそのまま返せる Outcome を持つ。 */

@@ -18,6 +18,15 @@ import type { RawAgent } from '../../src/types/agent.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+/** 偽の git が答える、ディレクトリごとの様子。 */
+export interface FakeGit {
+  readonly repository?: boolean;
+  readonly branch?: string;
+  readonly upstream?: string | null;
+  readonly uncommitted?: readonly string[];
+  readonly unpushed?: number;
+}
+
 export interface FakeCall {
   readonly command: string;
   readonly args: readonly string[];
@@ -40,6 +49,10 @@ export interface FakeWorld {
   readonly files: Map<string, string>;
   /** cuse が作ったディレクトリ */
   readonly directories: Set<string>;
+  /** sessionId → transcript の中身 */
+  readonly transcripts: Map<string, string>;
+  /** ディレクトリ → git の様子（無ければ「push 済みで変更なし」のリポジトリ） */
+  readonly git: Map<string, FakeGit>;
   readonly deps: OpsDeps;
 }
 
@@ -73,6 +86,8 @@ export const createFakeWorld = (
     resumeCopies: false,
     files: new Map<string, string>(),
     directories: new Set<string>(),
+    transcripts: new Map<string, string>(),
+    git: new Map<string, FakeGit>(),
   } as Omit<FakeWorld, 'deps'> & { deps?: OpsDeps };
 
   const runner: CommandRunner = async (command, args, runOptions) => {
@@ -80,10 +95,26 @@ export const createFakeWorld = (
 
     if (command === 'git') {
       const cwd = optionValue(args, '-C') ?? '';
-      if (world.nonRepositories.has(cwd)) {
+      const repo = world.git.get(cwd) ?? {};
+      if (world.nonRepositories.has(cwd) || repo.repository === false) {
         throw Object.assign(new Error('not a git repository'), { code: 128 });
       }
-      return 'true\n';
+      const rest = args.slice(2).join(' ');
+      if (rest === 'rev-parse --is-inside-work-tree') return 'true\n';
+      if (rest === 'rev-parse --abbrev-ref HEAD') return `${repo.branch ?? 'cuse/work'}\n`;
+      if (rest === 'status --porcelain') return (repo.uncommitted ?? []).map((line) => `${line}\n`).join('');
+      if (rest === 'rev-parse --abbrev-ref --symbolic-full-name @{u}') {
+        const upstream = repo.upstream === undefined ? `origin/${repo.branch ?? 'cuse/work'}` : repo.upstream;
+        if (upstream === null) throw new Error('no upstream');
+        return `${upstream}\n`;
+      }
+      if (rest === 'rev-parse --verify --quiet origin/HEAD') return 'abc\n';
+      if (rest.startsWith('rev-list --count')) return `${repo.unpushed ?? 0}\n`;
+      if (rest.startsWith('diff --stat')) return ' a | 1 +\n 1 file changed, 1 insertion(+)\n';
+      throw new Error(`偽の git が知らない呼び出し: ${rest}`);
+    }
+    if (command === 'gh') {
+      throw new Error('no pull requests found');
     }
 
     if (args[0] === '--version') {
@@ -91,6 +122,14 @@ export const createFakeWorld = (
     }
     if (args[0] === 'agents') {
       return JSON.stringify(world.agents);
+    }
+    if (args[0] === 'rm') {
+      const index = world.agents.findIndex((candidate) => candidate.id === args[1]);
+      if (index === -1) {
+        throw Object.assign(new Error(`no session ${args[1]}`), { code: 1 });
+      }
+      world.agents.splice(index, 1);
+      return '';
     }
     if (args[0] === 'stop') {
       const agent = world.agents.find((candidate) => candidate.id === args[1]);
@@ -173,6 +212,7 @@ export const createFakeWorld = (
     },
     checkVersion: async (minimum) => judgeClaudeVersion(world.version, minimum),
     readBundled: (relativePath) => readFile(join(ROOT, relativePath), 'utf8'),
+    readTranscript: async (_cwd, sessionId) => world.transcripts.get(sessionId) ?? null,
     makeDirectory: async (path) => {
       world.directories.add(path);
     },

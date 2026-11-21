@@ -25,6 +25,7 @@ export const makeWorker = (
   endedAt: null,
   endReason: null,
   promptCount: 0,
+  cleanedAt: null,
   ...overrides,
 });
 

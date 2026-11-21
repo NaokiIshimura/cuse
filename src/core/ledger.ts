@@ -41,6 +41,8 @@ export interface LedgerWorker {
   readonly endedAt: string | null;
   readonly endReason: string | null;
   readonly promptCount: number;
+  /** `cuse clean` で片付けた時刻。片付けていなければ null */
+  readonly cleanedAt: string | null;
 }
 
 export interface Ledger {
@@ -100,6 +102,7 @@ const toWorker = (value: unknown): LedgerWorker | null => {
       typeof promptCount === 'number' && Number.isInteger(promptCount) && promptCount >= 0
         ? promptCount
         : 0,
+    cleanedAt: toStringOrNull(value['cleanedAt']),
   };
 };
 
