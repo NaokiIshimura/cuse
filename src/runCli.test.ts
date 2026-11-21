@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { fetchAgents } from './core/fetchAgents.js';
 import type { CommandRunner } from './core/runCommand.js';
 import { runCli, type CliDeps, type CliFlags } from './runCli.js';
+import { createFakeWorld } from '../test/support/fakeClaude.js';
+import { makeLeader, makeLedger } from '../test/support/ledger.js';
+import { hashLeaderToken, LEADER_TOKEN_ENV } from './core/leaderToken.js';
 
 /**
  * CLI 全体の流れを、本物の `claude` を呼ばずに確かめる。
@@ -33,6 +36,7 @@ const fakeRunner =
   };
 
 const deps = (overrides: Partial<CliDeps> = {}): CliDeps => ({
+  ...createFakeWorld().deps,
   // meta は読まない（ホームの transcript に触れないように）
   fetchAgents: (options) => fetchAgents({ ...options, meta: false, runner: fakeRunner(agentsJson) }),
   readLedger: async () => ({ kind: 'missing' }),
@@ -196,5 +200,77 @@ describe('runCli', () => {
   it('--lines に負の数は渡せない', async () => {
     const result = await runCli('output', ['refactor'], flags({ lines: -1 }), deps());
     expect(result.code).toBe(1);
+  });
+});
+
+describe('runCli（操作系）', () => {
+  const leaderWorld = () =>
+    createFakeWorld({
+      ledger: makeLedger({ leader: makeLeader({ tokenHash: hashLeaderToken('t') }) }),
+      env: { [LEADER_TOKEN_ENV]: 't' },
+    });
+
+  const cliDeps = (world: ReturnType<typeof createFakeWorld>): CliDeps => ({
+    ...world.deps,
+    readLastReport: async () => null,
+    readLogs: async () => ({ ok: true, lines: [] }),
+  });
+
+  it('spawn → wait → kill を指揮役として通せる', async () => {
+    const world = leaderWorld();
+    const spawned = await runCli('spawn', ['テストを追加して', 'tests'], flags({ json: true }), cliDeps(world));
+    expect(spawned.code).toBe(0);
+    expect(parse(spawned.stdout)).toMatchObject({ name: 'tests', shortId: '0001beef' });
+
+    world.agents[0] = { ...world.agents[0], state: 'done', status: 'idle' };
+    const waited = await runCli('wait', ['tests'], flags({ json: true }), cliDeps(world));
+    expect(parse(waited.stdout)).toMatchObject({ met: true, sessions: [{ name: 'tests', status: 'done' }] });
+
+    const killed = await runCli('kill', ['tests'], flags({ reason: '終わったため' }), cliDeps(world));
+    expect(killed.code).toBe(0);
+    expect(killed.stdout).toContain('止めました');
+    expect(world.ledger.workers[0]?.endReason).toBe('終わったため');
+  });
+
+  it('指揮役でなければ spawn は denied', async () => {
+    const world = createFakeWorld();
+    const result = await runCli('spawn', ['t', 'tests'], flags({ json: true }), cliDeps(world));
+    expect(result.code).toBe(1);
+    expect(parse(result.stdout)).toMatchObject({ error: { kind: 'denied' } });
+  });
+
+  it('引数の数がちがえば使い方のエラー（タスクの引用符の付け忘れなど）', async () => {
+    const world = leaderWorld();
+    for (const [command, args] of [
+      ['spawn', ['テストを', '追加して', 'tests']],
+      ['spawn', ['t']],
+      ['prompt', ['tests']],
+      ['kill', []],
+    ] as const) {
+      const result = await runCli(command, [...args], flags({ json: true }), cliDeps(world));
+      expect(parse(result.stdout)).toMatchObject({ error: { kind: 'usage' } });
+    }
+    const until = await runCli('wait', ['tests'], flags({ json: true, until: 'soon' }), cliDeps(world));
+    expect(parse(until.stdout)).toMatchObject({ error: { kind: 'usage' } });
+  });
+
+  it('start が成功したらウィンドウを開く', async () => {
+    const world = createFakeWorld();
+    const result = await runCli('start', [], flags(), cliDeps(world));
+    expect(result.code).toBe(0);
+    expect(result.openApp).toBe(true);
+    expect(result.stdout).toContain('指揮役を起動しました');
+  });
+
+  it('install-skill は違う内容があれば conflict', async () => {
+    const world = createFakeWorld();
+    const first = await runCli('install-skill', [], flags(), cliDeps(world));
+    expect(first.code).toBe(0);
+    const path = [...world.files.keys()][0] ?? '';
+    world.files.set(path, 'mine');
+    const second = await runCli('install-skill', [], flags({ json: true }), cliDeps(world));
+    expect(parse(second.stdout)).toMatchObject({ error: { kind: 'conflict' } });
+    const forced = await runCli('install-skill', [], flags({ force: true }), cliDeps(world));
+    expect(forced.code).toBe(0);
   });
 });

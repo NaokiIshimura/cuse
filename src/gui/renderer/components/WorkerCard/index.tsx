@@ -13,6 +13,10 @@ interface WorkerCardProps {
   readonly frame: number;
   /** 経過時間の算出基準時刻 */
   readonly now: number;
+  /** 中央で開く。background セッションでなければ渡さない（claude attach できないため） */
+  readonly onOpen?: (() => void) | undefined;
+  /** 止める。台帳の配下でなければ渡さない（人が手で動かしているセッションは止めない） */
+  readonly onStop?: (() => void) | undefined;
 }
 
 /**
@@ -31,10 +35,11 @@ const lastActivity = (agent: Agent): string => {
 /**
  * 配下 1 つぶんのカード。Clawd の AA・名前・経過時間・状態・最後の動き。
  *
- * 読み取り専用なので、承認・停止などの操作は置かない（「開く」は第 2 段階）。
+ * 「開く」で中央に `claude attach` を開き、人はそこで承認する（承認のボタンは置かない）。
+ * 「止める」は台帳の配下にだけ出す。
  * 枠の色は状態の色にそろえ、承認待ちのカードが一目で分かるようにする。
  */
-const WorkerCardComponent = ({ agent, frame, now }: WorkerCardProps) => {
+const WorkerCardComponent = ({ agent, frame, now, onOpen, onStop }: WorkerCardProps) => {
   const { color } = getAppearance(agent.state);
   const elapsed = agent.startedAt > 0 ? formatDuration(now - agent.startedAt) : '-';
   const subagents = visibleSubagents(agent, now);
@@ -71,6 +76,20 @@ const WorkerCardComponent = ({ agent, frame, now }: WorkerCardProps) => {
             {activity}
           </span>
         </div>
+        {onOpen === undefined && onStop === undefined ? null : (
+          <div className="worker-card__actions">
+            {onOpen === undefined ? null : (
+              <button type="button" className="link-button" onClick={onOpen}>
+                開く
+              </button>
+            )}
+            {onStop === undefined ? null : (
+              <button type="button" className="link-button link-button--quiet" onClick={onStop}>
+                止める
+              </button>
+            )}
+          </div>
+        )}
         {subagents.length === 0 ? null : (
           <div
             className="worker-card__minis"

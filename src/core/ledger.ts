@@ -1,11 +1,12 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { buildLedgerPath } from './paths.js';
 
 /**
  * 台帳 `~/.cuse/ledger.json` の読み取り。
  *
  * 台帳は cuse が起動した指揮役と配下の記録で、cc-park など他のツールとの唯一の接点になる。
- * 書き込みは第 2 段階（`start` / `spawn`）から始めるため、第 1 段階は「あれば読むだけ」。
+ * `start` / `spawn` / `prompt` / `kill` が書き、ほかは読むだけ。
  * 形は `schema/ledger.schema.json` で公開している。項目を削る・意味を変えるときは `version` を上げる。
  */
 
@@ -16,6 +17,17 @@ export interface LedgerLeader {
   readonly sessionId: string;
   readonly name: string;
   readonly startedAt: string;
+  /** background セッションの短縮 ID。`claude attach` / `stop` に使う */
+  readonly shortId: string | null;
+  /** 指揮役を起動したディレクトリ */
+  readonly cwd: string;
+  /** 指揮役の権限モード。配下も同じにそろえる（違うと SendMessage が保留されるため）。既定なら null */
+  readonly permissionMode: string | null;
+  /**
+   * 指揮役のトークンの SHA-256。トークンそのものは指揮役の環境変数にだけ置き、ここには置かない
+   * （台帳は配下からも読めるため）。
+   */
+  readonly tokenHash: string | null;
 }
 
 export interface LedgerWorker {
@@ -58,6 +70,10 @@ const toLeader = (value: unknown): LedgerLeader | null => {
     sessionId: value['sessionId'],
     name: typeof value['name'] === 'string' ? value['name'] : '',
     startedAt: typeof value['startedAt'] === 'string' ? value['startedAt'] : '',
+    shortId: toStringOrNull(value['shortId']),
+    cwd: typeof value['cwd'] === 'string' ? value['cwd'] : '',
+    permissionMode: toStringOrNull(value['permissionMode']),
+    tokenHash: toStringOrNull(value['tokenHash']),
   };
 };
 
@@ -142,3 +158,91 @@ export const readLedger = async (options: ReadLedgerOptions): Promise<ReadLedger
     return { kind: 'invalid', message: '台帳の JSON を解析できませんでした。' };
   }
 };
+
+/** 台帳がまだ無いときの中身。 */
+export const emptyLedger = (): Ledger => ({ version: LEDGER_VERSION, leader: null, workers: [] });
+
+/** 書き込みの実装。テストから差し替える。 */
+export interface LedgerFileSystem {
+  readonly read: (path: string) => Promise<string>;
+  /** 一時ファイルに書いてから名前を変える（途中で落ちても壊れた台帳を残さない） */
+  readonly writeAtomic: (path: string, data: string) => Promise<void>;
+  /** 書き込みの排他。取れたら解放する関数を返す */
+  readonly lock: (path: string) => Promise<() => Promise<void>>;
+}
+
+/** ロックを待つ上限。これを超えたら、前の持ち主が落ちて残ったものとみなして奪う。 */
+const LOCK_STALE_MS = 10_000;
+const LOCK_RETRY_MS = 50;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const fsLedgerFileSystem: LedgerFileSystem = {
+  read: (path) => readFile(path, 'utf8'),
+  writeAtomic: async (path, data) => {
+    await mkdir(dirname(path), { recursive: true });
+    const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(temporary, data, { encoding: 'utf8', mode: 0o600 });
+    await rename(temporary, path);
+  },
+  lock: async (path) => {
+    const lockPath = `${path}.lock`;
+    await mkdir(dirname(path), { recursive: true });
+    const startedAt = Date.now();
+    for (;;) {
+      try {
+        const handle = await open(lockPath, 'wx');
+        await handle.close();
+        return () => rm(lockPath, { force: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
+        const age = await stat(lockPath).then(
+          (stats) => Date.now() - stats.mtimeMs,
+          () => 0,
+        );
+        if (age > LOCK_STALE_MS || Date.now() - startedAt > LOCK_STALE_MS) {
+          await rm(lockPath, { force: true });
+          continue;
+        }
+        await sleep(LOCK_RETRY_MS);
+      }
+    }
+  },
+};
+
+export interface UpdateLedgerOptions {
+  readonly home: string;
+  readonly fs?: LedgerFileSystem;
+}
+
+/**
+ * 台帳を読み、`update` で書き換えて保存する。書き換え後の台帳を返す。
+ *
+ * 指揮役が `spawn` を続けて呼んでも記録が消えないよう、読みから書きまでをロックで囲む。
+ * 壊れた台帳は上書きせずに例外にする（人が直せるよう、元のファイルを残す）。
+ */
+export const updateLedger = async (
+  update: (ledger: Ledger) => Ledger,
+  options: UpdateLedgerOptions,
+): Promise<Ledger> => {
+  const fs = options.fs ?? fsLedgerFileSystem;
+  const path = buildLedgerPath(options.home);
+  const release = await fs.lock(path);
+  try {
+    const current = await readLedger({ home: options.home, read: fs.read });
+    if (current.kind === 'invalid') {
+      throw new Error(`台帳を書き換えられません: ${current.message}（${path}）`);
+    }
+    const next = update(current.kind === 'ok' ? current.ledger : emptyLedger());
+    await fs.writeAtomic(path, `${JSON.stringify(next, null, 2)}\n`);
+    return next;
+  } finally {
+    await release();
+  }
+};
+
+/** 名前の重ならない、まだ終わっていない配下。 */
+export const activeLedgerWorkers = (ledger: Ledger): LedgerWorker[] =>
+  ledger.workers.filter((worker) => worker.endedAt === null);

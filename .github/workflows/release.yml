@@ -148,24 +148,16 @@ jobs:
           xattr -dr com.apple.quarantine /Applications/cuse.app
           ```
 
-          ## 動作確認
+          ## 使い方
 
-          `claude --bg --name <名前> "<指示>"` で background セッションを 2〜3 個動かしてから、次を実行します。
-          台帳（`~/.cuse/ledger.json`）は第 2 段階から書かれるので、いまは `--all` を付けて全セッションを見ます。
-
-          ```bash
-          cuse agents --all
-          ```
+          作業するリポジトリで次を実行すると、指揮役 `cuse-leader` が起動し、cuse のウィンドウが開きます。
+          ウィンドウの中央で指揮役に依頼してください。配下の承認は、左でその配下を「開く」と中央に出る Claude Code の画面で行います。
 
           ```bash
-          cuse status --all
+          cuse start
           ```
 
-          ```bash
-          cuse output <名前>
-          ```
-
-          ウィンドウ（`cuse app` か `cuse.app`）では、左上の「全セッション」に切り替えて一覧を見ます。
+          `.app` だけを入れた場合は、ウィンドウを開いて様子を見られます（指揮役の起動には CLI が要ります）。
           NOTES
           sed -i '' "s/VERSION/${VERSION}/g" release-notes.md
 

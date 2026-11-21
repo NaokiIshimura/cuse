@@ -68,6 +68,10 @@ export const normalizeAgent = (raw: RawAgent): Agent | null => {
     meta: undefined,
     // 起動元アプリも fetchAgents が親プロセスを辿って後から合成する
     launchApp: undefined,
+    // cuse で足した項目。承認待ちと入力待ちを見分けるのに使う
+    ...(typeof raw.waitingFor === 'string' && raw.waitingFor !== ''
+      ? { waitingFor: raw.waitingFor }
+      : {}),
   };
 };
 
@@ -91,6 +95,8 @@ const KNOWN_KEYS: ReadonlySet<string> = new Set([
   'id',
   'status',
   'state',
+  // cuse で足した（agent view のドキュメントに載っている項目）
+  'waitingFor',
 ]);
 
 /**

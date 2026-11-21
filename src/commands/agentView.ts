@@ -57,7 +57,7 @@ export const toAgentView = (
     kind: agent.kind,
     state: agent.state,
     rawState: agent.rawState,
-    waitingFor: waitingForOf(agent.state),
+    waitingFor: waitingForOf(agent.state, agent.waitingFor),
     pendingTool: pending === undefined ? null : { name: pending.name, detail: pending.detail },
     lastPrompt: agent.meta?.lastPrompt ?? null,
     context:

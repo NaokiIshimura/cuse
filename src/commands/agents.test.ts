@@ -1,3 +1,4 @@
+import { makeLeader } from '../../test/support/ledger.js';
 import { describe, expect, it } from 'vitest';
 import type { ReadLedgerResult } from '../core/ledger.js';
 import { makeAgent } from '../../test/support/agents.js';
@@ -7,7 +8,7 @@ const ledgerWith = (...sessionIds: string[]): ReadLedgerResult => ({
   kind: 'ok',
   ledger: {
     version: 1,
-    leader: { sessionId: 'leader-session', name: 'cuse-leader', startedAt: '' },
+    leader: makeLeader(),
     workers: sessionIds.map((sessionId) => ({
       name: sessionId,
       shortId: null,

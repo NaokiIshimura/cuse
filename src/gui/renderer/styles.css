@@ -388,3 +388,234 @@ button {
   font-size: 12px;
   background: var(--surface);
 }
+
+/* 中央（会話） */
+
+.center-pane {
+  min-width: 0;
+}
+
+.center-pane__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.character--large {
+  font-size: 18px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* 指揮役は cuse の色で描く（状態の色ではなく、誰なのかを示す） */
+.character--leader {
+  color: var(--accent);
+}
+
+.center-pane__who {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.center-pane__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.center-pane__state {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.badge {
+  background: var(--accent);
+  color: #141413;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.badge--worker {
+  background: var(--surface-raised);
+  color: var(--fg-muted);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--surface);
+}
+
+.tab--active {
+  background: var(--surface-raised);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.tab__label,
+.tab__close {
+  background: none;
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.tab--active .tab__label {
+  color: var(--fg);
+}
+
+.tab__close {
+  padding: 4px 8px 4px 0;
+}
+
+.center-pane__terminals {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.terminal-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0 0 12px;
+}
+
+.terminal-view--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.terminal-view__screen {
+  flex: 1;
+  min-height: 0;
+}
+
+.terminal-view__notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 12px 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.center-pane__hint {
+  margin: 0;
+  padding: 6px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+
+/* カードの操作 */
+
+.worker-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.worker-card__actions .link-button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.link-button--quiet {
+  color: var(--fg-muted);
+}
+
+/* 止める前の確認 */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 55%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.dialog {
+  width: min(440px, 90vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.dialog__text {
+  margin: 0;
+  color: var(--fg-muted);
+  line-height: 1.6;
+}
+
+.dialog__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--fg-muted);
+}
+
+.dialog__input {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.dialog__error {
+  margin: 0;
+  color: var(--ink-red);
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.danger-button {
+  background: color-mix(in srgb, var(--ink-red) 20%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--ink-red) 60%, transparent);
+  color: var(--ink-red);
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+}

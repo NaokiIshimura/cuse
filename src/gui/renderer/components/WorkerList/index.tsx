@@ -11,6 +11,10 @@ interface WorkerListProps {
   readonly frame: number;
   readonly now: number;
   readonly onScopeChange: (scope: ListScope) => void;
+  /** 台帳の配下の sessionId */
+  readonly workerIds: ReadonlySet<string>;
+  readonly onOpen: (agent: Agent) => void;
+  readonly onStop: (agent: Agent) => void;
 }
 
 /** 空のときの説明。第 1 段階は台帳が無いので、全セッション表示への切り替えを案内する。 */
@@ -31,7 +35,7 @@ const EmptyMessage = ({
       <p>
         {ledgerAvailable
           ? '動いている配下はいません。'
-          : '台帳（~/.cuse/ledger.json）がまだ無いので、配下はいません。配下の起動は第 2 段階で入ります。'}
+          : '台帳（~/.cuse/ledger.json）がまだ無いので、配下はいません。cuse start で指揮役を起動し、指揮役に依頼してください。'}
       </p>
       <button type="button" className="link-button" onClick={onShowAll}>
         マシン上の全セッションを表示
@@ -51,6 +55,9 @@ export const WorkerList = ({
   frame,
   now,
   onScopeChange,
+  workerIds,
+  onOpen,
+  onStop,
 }: WorkerListProps) => (
   <section className="worker-list" aria-label={scope === 'all' ? '全セッション' : '配下'}>
     <header className="pane-header">
@@ -90,7 +97,26 @@ export const WorkerList = ({
         <p className="worker-list__order">承認待ち順</p>
         <ul className="worker-list__cards">
           {active.map((agent) => (
-            <WorkerCard key={agent.sessionId} agent={agent} frame={frame} now={now} />
+            <WorkerCard
+              key={agent.sessionId}
+              agent={agent}
+              frame={frame}
+              now={now}
+              onOpen={
+                agent.kind === 'background' && agent.id !== undefined
+                  ? () => {
+                      onOpen(agent);
+                    }
+                  : undefined
+              }
+              onStop={
+                workerIds.has(agent.sessionId)
+                  ? () => {
+                      onStop(agent);
+                    }
+                  : undefined
+              }
+            />
           ))}
         </ul>
 

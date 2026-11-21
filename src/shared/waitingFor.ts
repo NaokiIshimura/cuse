@@ -10,7 +10,19 @@ import type { CharacterState } from '../types/agent.js';
  */
 export type WaitingFor = 'approval' | 'input';
 
-export const waitingForOf = (state: CharacterState): WaitingFor | null => {
+export const waitingForOf = (
+  state: CharacterState,
+  rawWaitingFor?: string | undefined,
+): WaitingFor | null => {
+  // `claude agents --json` が何を待っているかを出していれば、それを優先する
+  if (rawWaitingFor !== undefined && rawWaitingFor !== '') {
+    if (/permission|sandbox|worker/i.test(rawWaitingFor)) {
+      return 'approval';
+    }
+    if (/input|dialog/i.test(rawWaitingFor)) {
+      return 'input';
+    }
+  }
   if (state === 'blocked') {
     return 'approval';
   }

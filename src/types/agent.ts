@@ -22,6 +22,11 @@ export interface RawAgent {
   readonly status?: string;
   /** background セッションのみ: "blocked" | "done" | "stopped" など */
   readonly state?: string;
+  /**
+   * cuse で足した項目。`status` が `waiting` のとき、何を待っているか
+   * （`permission prompt` / `input needed` / `sandbox request` など）。
+   */
+  readonly waitingFor?: string;
 }
 
 /** セッション種別 */
@@ -121,6 +126,11 @@ export interface Agent {
    * 親プロセスから判定するため、pid を持たない・判定できない場合は undefined
    */
   readonly launchApp: string | undefined;
+  /**
+   * cuse で足した項目。`claude agents --json` の `waitingFor`（生の値）。
+   * 承認待ちと入力待ちを見分けるのに使う。無ければ省く（cc-park 由来のテストの形を変えないため任意項目にする）
+   */
+  readonly waitingFor?: string | undefined;
 }
 
 /** 状態遷移イベント。新規出現時は `from` が null になる。 */
