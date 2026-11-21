@@ -11,6 +11,25 @@ import { buildCuseBin } from '../core/paths.js';
  * Node.js や npm は要らない。アプリを移したり更新したりしても、次に開いたときに書き直される。
  */
 
+/**
+ * cuse コマンドを動かす実行ファイル。
+ *
+ * macOS では `.app` の本体（`Contents/MacOS/cuse`）を起こすと、Node として動かしても Dock にアプリとして出て、
+ * 指揮役が cuse コマンドを使うたびに Dock のアイコンが出たり消えたりする。
+ * Electron の `.app` に入っている補助プロセス（`Contents/Frameworks/cuse Helper.app`）は
+ * Info.plist で `LSUIElement`（Dock に出ないアプリ）になっているので、あればそちらで動かす。
+ * 無ければ（開発中・macOS 以外）本体のまま。
+ */
+export const nodeRunnerPath = (execPath: string, exists: (path: string) => boolean): string => {
+  const matched = /^(.+\.app)\/Contents\/MacOS\/([^/]+)$/.exec(execPath);
+  if (matched === null) {
+    return execPath;
+  }
+  const [, bundle, name] = matched;
+  const helper = `${bundle}/Contents/Frameworks/${name} Helper.app/Contents/MacOS/${name} Helper`;
+  return exists(helper) ? helper : execPath;
+};
+
 /** sh の 1 つの引数として安全に埋め込めるよう、単一引用符で囲む。 */
 export const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
 
