@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseLedger, readLedger } from './ledger.js';
+import {
+  activeLedgerWorkers,
+  emptyLedger,
+  parseLedger,
+  readLedger,
+  updateLedger,
+  type LedgerFileSystem,
+} from './ledger.js';
 
 const worker = {
   name: 'tests',
@@ -25,7 +32,15 @@ describe('parseLedger', () => {
       kind: 'ok',
       ledger: {
         version: 1,
-        leader: { sessionId: 'session-leader', name: 'cuse-leader', startedAt: '2026-11-21T09:00:00Z' },
+        leader: {
+          sessionId: 'session-leader',
+          name: 'cuse-leader',
+          startedAt: '2026-11-21T09:00:00Z',
+          shortId: null,
+          cwd: '',
+          permissionMode: null,
+          tokenHash: null,
+        },
         workers: [worker],
       },
     });
@@ -78,5 +93,66 @@ describe('readLedger', () => {
   it('壊れた JSON は invalid', async () => {
     const result = await readLedger({ home: '/home/u', read: async () => '{' });
     expect(result.kind).toBe('invalid');
+  });
+});
+
+/** メモリ上の偽のファイルシステム。書いた内容と、ロックの取り外しを記録する。 */
+const memoryFs = (initial?: string) => {
+  const files = new Map<string, string>();
+  if (initial !== undefined) {
+    files.set('/home/u/.cuse/ledger.json', initial);
+  }
+  const events: string[] = [];
+  const fs: LedgerFileSystem = {
+    read: async (path) => {
+      const value = files.get(path);
+      if (value === undefined) {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      }
+      return value;
+    },
+    writeAtomic: async (path, data) => {
+      events.push('write');
+      files.set(path, data);
+    },
+    lock: async () => {
+      events.push('lock');
+      return async () => {
+        events.push('unlock');
+      };
+    },
+  };
+  return { fs, files, events };
+};
+
+describe('updateLedger', () => {
+  it('台帳が無ければ空から作り、ロックの中で書く', async () => {
+    const { fs, files, events } = memoryFs();
+    const next = await updateLedger(
+      (ledger) => ({ ...ledger, workers: [...ledger.workers, worker] }),
+      { home: '/home/u', fs },
+    );
+    expect(next.workers).toEqual([worker]);
+    expect(JSON.parse(files.get('/home/u/.cuse/ledger.json') ?? '')).toEqual(next);
+    expect(events).toEqual(['lock', 'write', 'unlock']);
+  });
+
+  it('壊れた台帳は上書きせず例外にする（ロックは外す）', async () => {
+    const { fs, files, events } = memoryFs('{');
+    await expect(updateLedger((ledger) => ledger, { home: '/home/u', fs })).rejects.toThrow(
+      '台帳を書き換えられません',
+    );
+    expect(files.get('/home/u/.cuse/ledger.json')).toBe('{');
+    expect(events).toEqual(['lock', 'unlock']);
+  });
+});
+
+describe('activeLedgerWorkers', () => {
+  it('終わっていない配下だけを返す', () => {
+    const ledger = {
+      ...emptyLedger(),
+      workers: [worker, { ...worker, name: 'old', endedAt: '2026-11-21T10:00:00Z' }],
+    };
+    expect(activeLedgerWorkers(ledger).map((w) => w.name)).toEqual(['tests']);
   });
 });

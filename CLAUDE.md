@@ -8,8 +8,9 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 起動・監視・指示・回収・停止できるようにする CLI と、人が見るデスクトップアプリ（Electron）。
 何をどう作るかは `docs/HANDOFF.md`、設計の理由は `docs/cuse 企画書（単体ツール版）.md` にある。
 
-いまは **第 1 段階（v0.1.0、読み取り専用）**。セッションを起動・停止・書き換えるコードは入れない。
-第 2 段階以降の機能（`start` / `spawn` / `kill` など）は、Naoki が第 1 段階を確かめてから始める。
+いまは **第 2 段階（v0.2.0、指揮）**。`start` / `spawn` / `prompt` / `wait` / `kill`、台帳の書き込み、指揮役のトークン、
+cuse スキルと心得、ウィンドウ中央の埋め込み端末まで。第 3 段階（`review` / `clean`、プレビュー、OS 通知）は、
+Naoki が第 2 段階を確かめてから始める。
 
 ## 作業ルール
 
@@ -56,13 +57,16 @@ README のインストール手順は `releases/latest/download/` のバージ�
 | `src/types/` | `claude agents --json` の生データと正規化した型（cc-park から写した） |
 | `src/shared/` | UI 非依存の判断（AA 定義・並べ替え・役割分け・名前の解決・健全性）。renderer からも使うので `node:*` に依存させない |
 | `src/core/` | 外部コマンド実行・ファイル読み取りなど副作用。`runCommand` で差し替えられる |
-| `src/commands/` | `status` / `agents` / `output` の結果の組み立てと文字の整形 |
+| `src/commands/` | 各コマンドの本体。操作系（`run*`）は外への口を `OpsDeps` で受け取り、`Outcome` を返す |
 | `src/runCli.ts` | CLI の本体。外部への読み取りを `deps` で受け取り、テストで偽物を渡せる |
 | `src/cli.ts` | 引数の解釈とプロセスの出入りだけ |
 | `src/gui/` | Electron の main / preload / renderer |
 | `src/config/defaults.ts` | 未決事項の仮の値（上限など）。決まっていない値はここに集める |
 | `schema/` | 台帳 `~/.cuse/ledger.json` の JSON Schema（他のツール向けに公開） |
+| `prompts/` | 指揮役・配下の心得（`--append-system-prompt` で渡す）。npm パッケージに同梱する |
+| `skill/cuse/SKILL.md` | cuse スキル（指揮役向けのコマンドの使い方）。`start` / `install-skill` が `~/.claude/skills/cuse/` に置く |
 | `test/fixtures/` | `claude agents --json` と transcript の見本 |
+| `test/support/fakeClaude.ts` | 本物の `claude` の代わりに使う偽物（`--bg` / `--resume` / `stop` / `agents` / `git rev-parse` に答え、呼ばれ方を記録する） |
 
 ### cc-park から写したコード
 
@@ -74,6 +78,14 @@ cc-park v0.25.0 から写した。ファイルの先頭に「写し元: cc-park 
 `test/fixtures/agents/` に置き、`src/core/fixtures.test.ts` で正規化できることを固定している。
 出力の形が変わったら、まずサンプルを足してテストを落とし、それから `src/core/normalizeAgent.ts` を直す。
 
+### `claude` を起動・停止するコード
+
+`claude --bg` / `--resume` / `stop` の引数は `src/core/claudeBg.ts` だけで組み立て、`claudeBg.test.ts` で固定している。
+権限を広げる引数（`--dangerously-skip-permissions`、`bypassPermissions` など）はここで組み立てない。
+指揮役のトークンは `withoutLeaderToken` で外してから配下を起動する。新しい起動経路を足すときも必ず通す。
+
+操作系のテストは `test/support/fakeClaude.ts` の偽物で書き、呼ばれた引数・環境変数・作業ディレクトリを確かめる。
+
 ### `--json` の出力
 
 指揮役が読むので形を安定させる。項目の削除・意味の変更は minor を上げて README に書く。
@@ -84,6 +96,10 @@ cc-park v0.25.0 から写した。ファイルの先頭に「写し元: cc-park 
 renderer は Node API を使えない（contextIsolation 有効、nodeIntegration 無効、sandbox 有効）。
 `node:*` に依存する処理は main プロセスへ IPC で委譲する（`tsconfig.gui.json` が型検査で混入を検出する）。
 IPC の口は `src/gui/ipc.ts` にまとめる。承認の口は作らない。
+
+埋め込み端末（node-pty）で動かすのは `claude attach <短縮 ID>` だけ。相手は main が台帳と一覧から決め（`src/gui/attachTarget.ts`）、
+renderer から来た値でコマンドを組み立てない。タブやウィンドウを閉じても attach を切るだけで、セッションは止めない。
+node-pty はネイティブモジュール。`.app` には macOS 用の prebuild だけを入れ、asar の外（`app.asar.unpacked`）に置く（`gui:package`）。
 
 ### キャラクター（AA）
 

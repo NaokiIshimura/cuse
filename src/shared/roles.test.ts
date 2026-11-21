@@ -1,3 +1,4 @@
+import { makeLeader } from '../../test/support/ledger.js';
 import { describe, expect, it } from 'vitest';
 import { makeAgent } from '../../test/support/agents.js';
 import { buildRoster, roleOf } from './roles.js';
@@ -12,7 +13,7 @@ describe('buildRoster', () => {
   it('台帳の sessionId だけで役割を決める（同名の手動セッションを配下にしない）', () => {
     const roster = buildRoster(agents, {
       version: 1,
-      leader: { sessionId: 'L', name: 'cuse-leader', startedAt: '' },
+      leader: makeLeader({ sessionId: 'L' }),
       workers: [
         {
           name: 'tests',

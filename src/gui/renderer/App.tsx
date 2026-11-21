@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAnimationTick } from '../../hooks/useAnimationTick.js';
 import { useTransitions } from '../../hooks/useTransitions.js';
 import type { Agent } from '../../types/agent.js';
 import type { CuseBridge, GuiEnvironment } from '../ipc.js';
+import { CenterPane, type TerminalTab } from './components/CenterPane/index.js';
 import { Placeholder } from './components/Placeholder/index.js';
+import { StopDialog } from './components/StopDialog/index.js';
 import { TopBar } from './components/TopBar/index.js';
 import { WorkerList } from './components/WorkerList/index.js';
 import { useReducedMotion } from './hooks/useReducedMotion.js';
@@ -15,20 +17,25 @@ const ANIMATION_INTERVAL_MS = 200;
 
 const NO_AGENTS: readonly Agent[] = [];
 
+/** 指揮役のタブの ID。指揮役は 1 人なので固定にする。 */
+export const LEADER_TAB_ID = 'leader';
+
 interface AppProps {
   readonly environment: GuiEnvironment;
   readonly bridge: CuseBridge;
 }
 
 /**
- * 第 1 段階のウィンドウ。読み取り専用で、上端のバーと左の一覧だけが動く。
- * 中央（指揮役の会話）は第 2 段階、右（プレビュー）は第 3 段階で入る。
+ * cuse のウィンドウ。上端のバー、左の一覧、中央の会話（埋め込み端末）、右のプレビュー（第 3 段階）。
  */
 export const App = ({ environment, bridge }: AppProps) => {
   const { snapshot, previousAgents } = useSnapshot(bridge);
   const [scope, setScope] = useState<ListScope>('workers');
   const [now, setNow] = useState(() => Date.now());
   const [blockedSince, setBlockedSince] = useState<ReadonlyMap<string, number>>(new Map());
+  const [openedTabs, setOpenedTabs] = useState<readonly TerminalTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [stopping, setStopping] = useState<Agent | null>(null);
   const reducedMotion = useReducedMotion();
   const frame = useAnimationTick(ANIMATION_INTERVAL_MS, !reducedMotion);
 
@@ -50,16 +57,70 @@ export const App = ({ environment, bridge }: AppProps) => {
     setBlockedSince((current) => nextBlockedSince(current, rawAgents, Date.now()));
   }, [rawAgents]);
 
+  const ledger = snapshot?.ledger ?? { kind: 'missing' as const };
   const model = useMemo(
     () =>
-      buildListModel(agents, snapshot?.ledger ?? { kind: 'missing' }, {
+      buildListModel(agents, ledger, {
         scope,
         now,
         maxWorkers: environment.maxWorkers,
         blockedSince,
       }),
-    [agents, snapshot?.ledger, scope, now, environment.maxWorkers, blockedSince],
+    [agents, ledger, scope, now, environment.maxWorkers, blockedSince],
   );
+
+  // 指揮役のタブは台帳に指揮役がいる間いつも先頭に置く（閉じられない）
+  const leaderRecord = ledger.kind === 'ok' ? ledger.ledger.leader : null;
+  const tabs = useMemo<readonly TerminalTab[]>(
+    () => [
+      ...(leaderRecord === null
+        ? []
+        : [
+            {
+              tabId: LEADER_TAB_ID,
+              sessionId: leaderRecord.sessionId,
+              title: leaderRecord.name,
+              role: 'leader' as const,
+            },
+          ]),
+      ...openedTabs,
+    ],
+    [leaderRecord, openedTabs],
+  );
+  const shownTabId =
+    activeTabId !== null && tabs.some((tab) => tab.tabId === activeTabId)
+      ? activeTabId
+      : (tabs[0]?.tabId ?? null);
+
+  const openAgent = useCallback(
+    (agent: Agent) => {
+      if (leaderRecord?.sessionId === agent.sessionId) {
+        setActiveTabId(LEADER_TAB_ID);
+        return;
+      }
+      const tabId = `session:${agent.sessionId}`;
+      setOpenedTabs((current) =>
+        current.some((tab) => tab.tabId === tabId)
+          ? current
+          : [
+              ...current,
+              {
+                tabId,
+                sessionId: agent.sessionId,
+                title: agent.name,
+                role: model.workerIds.has(agent.sessionId) ? 'worker' : 'other',
+              },
+            ],
+      );
+      setActiveTabId(tabId);
+    },
+    [leaderRecord, model.workerIds],
+  );
+
+  const closeTab = useCallback((tabId: string) => {
+    setOpenedTabs((current) => current.filter((tab) => tab.tabId !== tabId));
+    setActiveTabId((current) => (current === tabId ? null : current));
+  }, []);
 
   return (
     <div className="app">
@@ -86,12 +147,19 @@ export const App = ({ environment, bridge }: AppProps) => {
             frame={frame}
             now={now}
             onScopeChange={setScope}
+            workerIds={model.workerIds}
+            onOpen={openAgent}
+            onStop={setStopping}
           />
         )}
-        <Placeholder
-          title="LEADER"
-          stage="第 2 段階で入ります"
-          description="ここに指揮役 cuse-leader の会話（claude attach の埋め込み端末）が入ります。左の配下を「開く」と、その配下の会話もタブで開けるようになります。"
+        <CenterPane
+          bridge={bridge}
+          tabs={tabs}
+          activeTabId={shownTabId}
+          agents={agents}
+          frame={frame}
+          onSelect={setActiveTabId}
+          onClose={closeTab}
         />
         <Placeholder
           title="PREVIEW"
@@ -100,8 +168,24 @@ export const App = ({ environment, bridge }: AppProps) => {
         />
       </main>
       <footer className="footer">
-        読み取り専用のウィンドウです。承認は claude attach か agent view で行ってください。
+        承認は、左で配下を「開く」と中央に出る Claude Code の画面で行います。ウィンドウを閉じても指揮役と配下は止まりません。
       </footer>
+      {stopping === null ? null : (
+        <StopDialog
+          name={stopping.name}
+          onCancel={() => {
+            setStopping(null);
+          }}
+          onConfirm={async (reason) => {
+            const result = await bridge.stopWorker(stopping.sessionId, reason);
+            if (result.ok) {
+              setStopping(null);
+              return null;
+            }
+            return result.message;
+          }}
+        />
+      )}
     </div>
   );
 };

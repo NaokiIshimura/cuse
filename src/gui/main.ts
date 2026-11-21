@@ -1,14 +1,27 @@
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, type WebContents } from 'electron';
+import { spawn as spawnPty } from 'node-pty';
+import { runKill } from '../commands/kill.js';
 import { MAX_WORKERS } from '../config/defaults.js';
 import { createAgentsObserver } from '../core/agentsDebug.js';
 import { checkClaudeVersion, type ClaudeVersionCheck } from '../core/claudeVersion.js';
 import { fetchAgents } from '../core/fetchAgents.js';
 import { readLedger } from '../core/ledger.js';
+import { withoutLeaderToken } from '../core/leaderToken.js';
 import { resolveShellPath } from '../core/shellPath.js';
-import { IPC_CHANNELS, type GuiEnvironment, type Snapshot } from './ipc.js';
+import { defaultDeps } from '../runCli.js';
+import { resolveAttachTarget } from './attachTarget.js';
+import {
+  IPC_CHANNELS,
+  type GuiEnvironment,
+  type OpenTerminalRequest,
+  type OpenTerminalResult,
+  type Snapshot,
+  type StopWorkerResult,
+} from './ipc.js';
+import { createTerminalManager } from './terminals.js';
 
 /**
  * Electron の main プロセス（cc-park `src/gui/main.ts` @ `d1f0f2d` の骨組みを元に、
@@ -16,7 +29,8 @@ import { IPC_CHANNELS, type GuiEnvironment, type Snapshot } from './ipc.js';
  *
  * 判断を伴う処理は持たず、ウィンドウ生成と core への取り次ぎだけを行う
  * （ロジックは共有モジュール側でテストする）。
- * ウィンドウを閉じても配下は止めない。配下は Claude Code の background セッションとして動き続ける。
+ * ウィンドウを閉じても指揮役と配下は止めない。埋め込み端末の attach を切るだけで、
+ * セッションは Claude Code の background セッションとして動き続ける。
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -26,6 +40,24 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  * userData の保存先などがその名前になってしまうため、app.whenReady() より前に明示する。
  */
 app.setName('cuse');
+
+/**
+ * ウィンドウは 1 つだけにする。`cuse start` を何度実行しても、前のウィンドウを前に出す。
+ * 指揮役がマシンに 1 人なので、それを映すウィンドウも 1 つでよい。
+ */
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+app.on('second-instance', () => {
+  const [window] = BrowserWindow.getAllWindows();
+  if (window !== undefined) {
+    if (window.isMinimized()) {
+      window.restore();
+    }
+    window.show();
+    window.focus();
+  }
+});
 
 /** 3 列（左の一覧・中央の会話・右のプレビュー）が並ぶ横長のウィンドウ。 */
 const WINDOW_WIDTH = 1280;
@@ -67,6 +99,94 @@ ipcMain.handle(IPC_CHANNELS.getSnapshot, async (): Promise<Snapshot> => {
   return { agents, ledger, at: Date.now() };
 });
 
+/** 出力を送る先のウィンドウ。閉じたあとは送らない。 */
+let terminalTarget: WebContents | null = null;
+
+const sendToRenderer = (channel: string, ...args: unknown[]): void => {
+  if (terminalTarget !== null && !terminalTarget.isDestroyed()) {
+    terminalTarget.send(channel, ...args);
+  }
+};
+
+/** 埋め込み端末。`claude attach` だけを動かす。指揮役のトークンは渡さない。 */
+const terminals = createTerminalManager({
+  spawnPty: (file, args, options) =>
+    spawnPty(file, [...args], {
+      name: 'xterm-256color',
+      cols: options.cols,
+      rows: options.rows,
+      cwd: options.cwd,
+      env: options.env as Record<string, string>,
+    }),
+  cwd: home,
+  env: () => ({ ...withoutLeaderToken(process.env), TERM: 'xterm-256color' }),
+  onData: (tabId, data) => {
+    sendToRenderer(IPC_CHANNELS.terminalData, tabId, data);
+  },
+  onExit: (tabId, exitCode) => {
+    sendToRenderer(IPC_CHANNELS.terminalExit, tabId, exitCode);
+  },
+});
+
+ipcMain.handle(
+  IPC_CHANNELS.openTerminal,
+  async (event, request: OpenTerminalRequest): Promise<OpenTerminalResult> => {
+    if (typeof request?.tabId !== 'string' || typeof request.sessionId !== 'string') {
+      return { ok: false, message: '開く相手が分かりません。' };
+    }
+    // 開く相手と実行するコマンドは、renderer の値をそのまま使わずに台帳と一覧から決める
+    const [agents, ledger] = await Promise.all([fetchAgents({ all: true, home }), readLedger({ home })]);
+    const target = resolveAttachTarget(
+      request.sessionId,
+      ledger.kind === 'ok' ? ledger.ledger : null,
+      agents.ok ? agents.agents : [],
+    );
+    if (!target.ok) {
+      return target;
+    }
+    terminalTarget = event.sender;
+    terminals.open(request.tabId, target.shortId, request.cols, request.rows);
+    return { ok: true, name: target.name, shortId: target.shortId, role: target.role };
+  },
+);
+
+ipcMain.on(IPC_CHANNELS.writeTerminal, (_event, tabId: unknown, data: unknown) => {
+  if (typeof tabId === 'string' && typeof data === 'string') {
+    terminals.write(tabId, data);
+  }
+});
+
+ipcMain.on(IPC_CHANNELS.resizeTerminal, (_event, tabId: unknown, cols: unknown, rows: unknown) => {
+  if (typeof tabId === 'string') {
+    terminals.resize(tabId, cols as number, rows as number);
+  }
+});
+
+ipcMain.on(IPC_CHANNELS.closeTerminal, (_event, tabId: unknown) => {
+  if (typeof tabId === 'string') {
+    terminals.close(tabId);
+  }
+});
+
+/**
+ * 人が配下を止める。指揮役のトークンは要らないが、止められるのは台帳の配下だけ（runKill が確かめる）。
+ */
+ipcMain.handle(
+  IPC_CHANNELS.stopWorker,
+  async (_event, sessionId: unknown, reason: unknown): Promise<StopWorkerResult> => {
+    if (typeof sessionId !== 'string' || typeof reason !== 'string' || reason.trim() === '') {
+      return { ok: false, message: '止める理由を書いてください。' };
+    }
+    const outcome = await runKill(
+      { name: sessionId, reason: `人がウィンドウから止めた: ${reason.trim()}`, byHuman: true },
+      defaultDeps(),
+    );
+    return outcome.ok
+      ? { ok: true, message: outcome.text }
+      : { ok: false, message: outcome.error.message };
+  },
+);
+
 /** vite の dev サーバ経由で起動する場合の URL。未設定ならビルド済み HTML を読む。 */
 const devServerUrl = process.env['CUSE_DEV_SERVER'];
 
@@ -101,6 +221,12 @@ const createWindow = async (): Promise<void> => {
 
   window.once('ready-to-show', () => {
     window.show();
+  });
+
+  // ウィンドウを閉じたら attach を切る（セッションは止めない）
+  window.on('closed', () => {
+    terminals.closeAll();
+    terminalTarget = null;
   });
 
   if (devServerUrl !== undefined && devServerUrl !== '') {
@@ -146,5 +272,6 @@ app.on('activate', () => {
 
 // ウィンドウを閉じたらアプリは終える。配下は background セッションなので止まらない
 app.on('window-all-closed', () => {
+  terminals.closeAll();
   app.quit();
 });

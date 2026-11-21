@@ -10,6 +10,11 @@ export type CommandRunner = (
     readonly signal: AbortSignal | undefined;
     /** 実行時の作業ディレクトリ。未指定なら呼び出し元のまま */
     readonly cwd?: string;
+    /**
+     * cuse で足した項目。子プロセスへ渡す環境変数。未指定なら呼び出し元のまま。
+     * 指揮役のトークンを配下へ渡さないよう、`spawn` が外した環境を渡すのに使う
+     */
+    readonly env?: NodeJS.ProcessEnv;
   },
 ) => Promise<string>;
 
@@ -34,6 +39,7 @@ export const execFileRunner: CommandRunner = (command, args, options) =>
         maxBuffer: MAX_BUFFER,
         ...(options.signal === undefined ? {} : { signal: options.signal }),
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        ...(options.env === undefined ? {} : { env: options.env }),
       },
       (error, stdout) => {
         if (error) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeAgent } from '../../test/support/agents.js';
-import { resolveAgent } from './resolveAgent.js';
+import { makeWorker } from '../../test/support/ledger.js';
+import { resolveAgent, resolveWorker } from './resolveAgent.js';
 
 const agents = [
   makeAgent({ name: 'tests', id: 'aaaa1111', sessionId: 'aaaa1111-0000' }),
@@ -35,6 +36,7 @@ describe('resolveAgent', () => {
     if (!result.ok && result.kind === 'ambiguous') {
       expect(result.candidates.map((agent) => agent.name)).toEqual(['tests', 'tests-e2e']);
       expect(result.message).toContain('tests（aaaa1111）');
+      expect(result.message).toContain('複数あります');
     } else {
       throw new Error('ambiguous になるはず');
     }
@@ -43,5 +45,25 @@ describe('resolveAgent', () => {
   it('見つからなければ not-found', () => {
     expect(nameOf('nothing')).toBe('not-found');
     expect(nameOf('  ')).toBe('not-found');
+  });
+});
+
+describe('resolveWorker', () => {
+  const workers = [
+    makeWorker({ name: 'tests', shortId: 'aaaa1111' }),
+    makeWorker({ name: 'readme', shortId: null }),
+  ];
+
+  it('台帳の配下を名前・短縮 ID で探す', () => {
+    const byName = resolveWorker(workers, 'readme');
+    expect(byName.ok && byName.item.name).toBe('readme');
+    const byId = resolveWorker(workers, 'aaaa1111');
+    expect(byId.ok && byId.item.name).toBe('tests');
+  });
+
+  it('台帳に無ければ not-found（台帳に載った配下だけを指せる）', () => {
+    const result = resolveWorker(workers, 'hand');
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.message).toContain('台帳');
   });
 });

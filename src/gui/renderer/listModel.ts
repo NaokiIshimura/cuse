@@ -29,6 +29,8 @@ export interface ListModel {
   readonly warnings: readonly HealthWarning[];
   /** 台帳が無い・読めない。切り替えの案内に使う */
   readonly ledgerAvailable: boolean;
+  /** 台帳に載った配下の sessionId。「止める」は台帳の配下にだけ出す */
+  readonly workerIds: ReadonlySet<string>;
 }
 
 export interface BuildListModelOptions {
@@ -56,13 +58,14 @@ export const buildListModel = (
     active: sorted.filter((agent) => !FINISHED_STATES.has(agent.state)),
     finished: sorted.filter((agent) => FINISHED_STATES.has(agent.state)),
     activeCount: countActive(roster.workers),
-    attentionCount: targets.filter((agent) => waitingForOf(agent.state) !== null).length,
+    attentionCount: targets.filter((agent) => waitingForOf(agent.state, agent.waitingFor) !== null).length,
     warnings: healthWarnings(roster.workers, {
       now: options.now,
       blockedSince: options.blockedSince,
       maxWorkers: options.maxWorkers,
     }),
     ledgerAvailable: ledger.kind === 'ok',
+    workerIds: new Set(roster.ledgerWorkers.keys()),
   };
 };
 

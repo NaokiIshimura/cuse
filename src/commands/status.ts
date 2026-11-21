@@ -63,7 +63,7 @@ export const buildStatusOutput = (
 
   const attention: AttentionItem[] = [];
   for (const agent of sortAgents(targets)) {
-    const waitingFor = waitingForOf(agent.state);
+    const waitingFor = waitingForOf(agent.state, agent.waitingFor);
     if (waitingFor === null) {
       continue;
     }
