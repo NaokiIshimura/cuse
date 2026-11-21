@@ -3,6 +3,7 @@ import { useAnimationTick } from '../../hooks/useAnimationTick.js';
 import { useTransitions } from '../../hooks/useTransitions.js';
 import type { Agent } from '../../types/agent.js';
 import type { CuseBridge, GuiEnvironment } from '../ipc.js';
+import type { LeaderStartup } from '../leaderStartup.js';
 import { CenterPane, type TerminalTab } from './components/CenterPane/index.js';
 import { Placeholder } from './components/Placeholder/index.js';
 import { StopDialog } from './components/StopDialog/index.js';
@@ -16,6 +17,10 @@ import { buildListModel, nextBlockedSince, type ListScope } from './listModel.js
 const ANIMATION_INTERVAL_MS = 200;
 
 const NO_AGENTS: readonly Agent[] = [];
+
+/** 指揮役をそろえたときの警告（スキルが別の内容で置かれている、など）を上端に出す。 */
+const leaderNotices = (startup: LeaderStartup | undefined): readonly string[] =>
+  startup?.kind === 'ready' ? startup.warnings : [];
 
 /** 指揮役のタブの ID。指揮役は 1 人なので固定にする。 */
 export const LEADER_TAB_ID = 'leader';
@@ -132,6 +137,8 @@ export const App = ({ environment, bridge }: AppProps) => {
         warnings={model.warnings}
         claudeVersion={environment.claudeVersion}
         fetchError={fetched !== undefined && !fetched.ok ? fetched.error.message : null}
+        notices={leaderNotices(snapshot?.leaderStartup)}
+        leaderPending={snapshot === null || snapshot.leaderStartup.kind === 'starting'}
       />
       <main className="columns">
         {snapshot === null ? (
@@ -160,6 +167,10 @@ export const App = ({ environment, bridge }: AppProps) => {
           frame={frame}
           onSelect={setActiveTabId}
           onClose={closeTab}
+          leaderStartup={snapshot?.leaderStartup ?? null}
+          onRetryLeader={() => {
+            void bridge.ensureLeader();
+          }}
         />
         <Placeholder
           title="PREVIEW"

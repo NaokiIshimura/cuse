@@ -97,6 +97,9 @@ renderer は Node API を使えない（contextIsolation 有効、nodeIntegratio
 `node:*` に依存する処理は main プロセスへ IPC で委譲する（`tsconfig.gui.json` が型検査で混入を検出する）。
 IPC の口は `src/gui/ipc.ts` にまとめる。承認の口は作らない。
 
+ウィンドウを開くと main が `runStart`（`cuse start` と同じ処理）で指揮役をそろえる（`src/gui/leaderStartup.ts`）。
+重ねて走らせないようにしてあり、指揮役がマシンに 1 人という約束はそのまま守られる。`.app` にも `prompts/` と `skill/` を入れる。
+
 埋め込み端末（node-pty）で動かすのは `claude attach <短縮 ID>` だけ。相手は main が台帳と一覧から決め（`src/gui/attachTarget.ts`）、
 renderer から来た値でコマンドを組み立てない。タブやウィンドウを閉じても attach を切るだけで、セッションは止めない。
 node-pty はネイティブモジュール。`.app` には macOS 用の prebuild だけを入れ、asar の外（`app.asar.unpacked`）に置く（`gui:package`）。

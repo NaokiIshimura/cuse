@@ -15,6 +15,10 @@ interface TopBarProps {
   readonly claudeVersion: ClaudeVersionCheck;
   /** 一覧の取得に失敗していれば、その説明 */
   readonly fetchError: string | null;
+  /** そのほかの知らせ（指揮役を起こしたときの警告など） */
+  readonly notices?: readonly string[];
+  /** 指揮役を起こしている途中か（指揮役がいない間の書き方を変える） */
+  readonly leaderPending?: boolean;
 }
 
 /**
@@ -29,12 +33,15 @@ export const TopBar = ({
   warnings,
   claudeVersion,
   fetchError,
+  notices: extraNotices = [],
+  leaderPending = false,
 }: TopBarProps) => {
   const tokens = leader?.meta?.tokens;
   const notices = [
     ...(fetchError === null ? [] : [fetchError]),
     ...(claudeVersion.ok ? [] : [claudeVersion.message]),
     ...warnings.map((warning) => warning.message),
+    ...extraNotices,
   ];
 
   return (
@@ -44,7 +51,7 @@ export const TopBar = ({
         <span className="top-bar__leader">
           指揮役{' '}
           {leader === null ? (
-            <span className="muted">なし（第 2 段階の cuse start で起動）</span>
+            <span className="muted">{leaderPending ? '起こしています…' : 'なし'}</span>
           ) : (
             <>
               <strong>{leader.name}</strong>{' '}

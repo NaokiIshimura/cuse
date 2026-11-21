@@ -1,6 +1,7 @@
 import type { ClaudeVersionCheck } from '../core/claudeVersion.js';
 import type { FetchAgentsResult } from '../core/fetchAgents.js';
 import type { ReadLedgerResult } from '../core/ledger.js';
+import type { LeaderStartup } from './leaderStartup.js';
 
 /**
  * main / preload / renderer で共有する IPC チャンネル名。
@@ -28,6 +29,8 @@ export const IPC_CHANNELS = {
   terminalExit: 'terminal:exit',
   /** 人が配下を止める（台帳の配下だけ） */
   stopWorker: 'worker:stop',
+  /** 指揮役をそろえ直す（起こせなかったときの「もう一度」） */
+  ensureLeader: 'leader:ensure',
 } as const;
 
 /** 起動時に 1 回だけ取る環境。 */
@@ -42,6 +45,8 @@ export interface GuiEnvironment {
 export interface Snapshot {
   readonly agents: FetchAgentsResult;
   readonly ledger: ReadLedgerResult;
+  /** アプリを開いたときに指揮役をそろえた結果 */
+  readonly leaderStartup: LeaderStartup;
   /** 取得した時刻（epoch ms） */
   readonly at: number;
 }
@@ -78,4 +83,5 @@ export interface CuseBridge {
   readonly onTerminalData: (listener: (tabId: string, data: string) => void) => () => void;
   readonly onTerminalExit: (listener: (tabId: string, exitCode: number) => void) => () => void;
   readonly stopWorker: (sessionId: string, reason: string) => Promise<StopWorkerResult>;
+  readonly ensureLeader: () => Promise<LeaderStartup>;
 }

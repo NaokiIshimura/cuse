@@ -157,7 +157,8 @@ jobs:
           cuse start
           ```
 
-          `.app` だけを入れた場合は、ウィンドウを開いて様子を見られます（指揮役の起動には CLI が要ります）。
+          `.app` を開いても、同じように指揮役がそろいます（作業ディレクトリはホーム。配下は `cuse spawn --cwd` でどのリポジトリにも回せます）。
+          指揮役が `cuse` コマンドを使うので、CLI も入れておいてください。
           NOTES
           sed -i '' "s/VERSION/${VERSION}/g" release-notes.md
 

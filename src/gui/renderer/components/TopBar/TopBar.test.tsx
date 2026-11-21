@@ -51,7 +51,24 @@ describe('TopBar', () => {
       />,
     );
     expect(container.textContent).toContain('指揮役 なし');
+    expect(container.textContent).not.toContain('起こしています');
     expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('指揮役を起こしている途中ならそう書く', () => {
+    const { container } = render(
+      <TopBar
+        leader={null}
+        activeCount={0}
+        maxWorkers={3}
+        attentionCount={0}
+        warnings={[]}
+        claudeVersion={ok}
+        fetchError={null}
+        leaderPending
+      />,
+    );
+    expect(container.textContent).toContain('指揮役 起こしています…');
   });
 
   it('取得の失敗・古いバージョン・健全性の警告を並べる', () => {

@@ -2,6 +2,7 @@ import { getFrame } from '../../../../shared/characters.js';
 import { STATE_LABELS_JA } from '../../../../shared/stateLabels.js';
 import type { Agent } from '../../../../types/agent.js';
 import type { CuseBridge } from '../../../ipc.js';
+import type { LeaderStartup } from '../../../leaderStartup.js';
 import { TerminalView } from '../TerminalView/index.js';
 
 /** 中央のタブ 1 つ。 */
@@ -21,15 +22,40 @@ interface CenterPaneProps {
   readonly frame: number;
   readonly onSelect: (tabId: string) => void;
   readonly onClose: (tabId: string) => void;
+  /** アプリを開いたときに指揮役をそろえた結果（まだ取れていなければ null） */
+  readonly leaderStartup: LeaderStartup | null;
+  /** 指揮役を起こせなかったときに、もう一度頼む */
+  readonly onRetryLeader: () => void;
 }
 
-/** 指揮役のいない間の案内。 */
-const NoLeader = () => (
+/**
+ * 指揮役のタブが出るまでの案内。アプリを開くと指揮役を起こすので、たいていは「起こしています」。
+ * 起こせなかったときは理由と「もう一度」を出す。
+ */
+const NoLeader = ({
+  startup,
+  onRetry,
+}: {
+  readonly startup: LeaderStartup | null;
+  readonly onRetry: () => void;
+}) => (
   <div className="placeholder__body">
-    <p className="placeholder__stage">指揮役がいません</p>
-    <p className="placeholder__description">
-      端末で cuse start を実行すると、指揮役 cuse-leader が起動し、ここにその会話が出ます。人の依頼は指揮役にだけ伝えます。
-    </p>
+    {startup?.kind === 'failed' ? (
+      <>
+        <p className="placeholder__stage">指揮役を起こせませんでした</p>
+        <p className="placeholder__description">{startup.message}</p>
+        <button type="button" className="link-button" onClick={onRetry}>
+          もう一度
+        </button>
+      </>
+    ) : (
+      <>
+        <p className="placeholder__stage">指揮役 cuse-leader を起こしています…</p>
+        <p className="placeholder__description">
+          起きると、ここに指揮役の会話が出ます。人の依頼は指揮役にだけ伝えます。
+        </p>
+      </>
+    )}
   </div>
 );
 
@@ -45,6 +71,8 @@ export const CenterPane = ({
   frame,
   onSelect,
   onClose,
+  leaderStartup,
+  onRetryLeader,
 }: CenterPaneProps) => {
   const active = tabs.find((tab) => tab.tabId === activeTabId) ?? null;
   const agent = active === null ? undefined : agents.find((a) => a.sessionId === active.sessionId);
@@ -53,7 +81,7 @@ export const CenterPane = ({
   return (
     <section className="center-pane" aria-label="会話">
       {active === null ? (
-        <NoLeader />
+        <NoLeader startup={leaderStartup} onRetry={onRetryLeader} />
       ) : (
         <>
           <header className="center-pane__header">

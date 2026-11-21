@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, shell, type WebContents } from 'electron';
 import { spawn as spawnPty } from 'node-pty';
 import { runKill } from '../commands/kill.js';
+import { runStart } from '../commands/start.js';
 import { MAX_WORKERS } from '../config/defaults.js';
 import { createAgentsObserver } from '../core/agentsDebug.js';
 import { checkClaudeVersion, type ClaudeVersionCheck } from '../core/claudeVersion.js';
@@ -21,6 +22,7 @@ import {
   type Snapshot,
   type StopWorkerResult,
 } from './ipc.js';
+import { createLeaderStartup, startupCwd } from './leaderStartup.js';
 import { createTerminalManager } from './terminals.js';
 
 /**
@@ -90,13 +92,23 @@ ipcMain.handle(
   (): GuiEnvironment => ({ claudeVersion, maxWorkers: MAX_WORKERS, platform: process.platform }),
 );
 
+/**
+ * アプリを開いたら指揮役をそろえる（`cuse start` と同じ処理）。
+ * 指揮役がいなければ起こし、止まっていれば再開し、動いていれば何もしない。
+ */
+const leaderStartup = createLeaderStartup(() =>
+  runStart({ cwd: startupCwd(process.cwd(), home) }, defaultDeps()),
+);
+
+ipcMain.handle(IPC_CHANNELS.ensureLeader, () => leaderStartup.ensure());
+
 ipcMain.handle(IPC_CHANNELS.getSnapshot, async (): Promise<Snapshot> => {
   // transcript の読み取りは node 側でしかできないため、ここで合成して renderer へ返す
   const [agents, ledger] = await Promise.all([
     fetchAgents({ all: true, meta: true, home, observe: observeAgents }),
     readLedger({ home }),
   ]);
-  return { agents, ledger, at: Date.now() };
+  return { agents, ledger, leaderStartup: leaderStartup.status(), at: Date.now() };
 });
 
 /** 出力を送る先のウィンドウ。閉じたあとは送らない。 */
@@ -258,6 +270,10 @@ app
   .then(preparePath)
   .then(prepareVersion)
   .then(createWindow)
+  // ウィンドウを先に見せてから指揮役をそろえる（起動を待つ間も一覧は見られる）
+  .then(() => {
+    void leaderStartup.ensure();
+  })
   .catch((error: unknown) => {
     console.error('ウィンドウの起動に失敗しました:', error);
     app.quit();
