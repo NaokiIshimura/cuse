@@ -19,6 +19,7 @@ const worker = {
   endedAt: null,
   endReason: null,
   promptCount: 0,
+  cleanedAt: null,
 };
 
 describe('parseLedger', () => {

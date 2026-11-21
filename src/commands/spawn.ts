@@ -177,6 +177,7 @@ export const runSpawn = async (input: SpawnInput, deps: OpsDeps): Promise<Outcom
     endedAt: null,
     endReason: null,
     promptCount: 0,
+    cleanedAt: null,
   };
   const saved = await saveLedger(deps, (current) => ({
     ...current,

@@ -10,7 +10,9 @@ import {
   installSkill,
   SKILL_SOURCE,
 } from './commands/installSkill.js';
+import { runClean } from './commands/clean.js';
 import { runKill } from './commands/kill.js';
+import { runReview } from './commands/review.js';
 import type { CommandErrorKind, Outcome } from './commands/outcome.js';
 import { buildOutputResult, formatOutputText } from './commands/output.js';
 import { runPrompt } from './commands/prompt.js';
@@ -22,7 +24,8 @@ import { buildDebugPath, createAgentsObserver } from './core/agentsDebug.js';
 import { checkClaudeVersion } from './core/claudeVersion.js';
 import { fetchAgents, type FetchAgentsOptions } from './core/fetchAgents.js';
 import { readLedger, updateLedger } from './core/ledger.js';
-import { readLastReport, readLogs, type ReadLogsResult } from './core/readOutput.js';
+import { OUTPUT_TAIL_BYTES, readLastReport, readLogs, readTail, type ReadLogsResult } from './core/readOutput.js';
+import { buildTranscriptPath } from './shared/transcriptPath.js';
 import { execFileRunner } from './core/runCommand.js';
 import { resolveAgent } from './shared/resolveAgent.js';
 import type { Agent } from './types/agent.js';
@@ -46,6 +49,8 @@ export type CommandName =
   | 'prompt'
   | 'wait'
   | 'kill'
+  | 'review'
+  | 'clean'
   | 'install-skill';
 
 export const COMMANDS: readonly CommandName[] = [
@@ -57,6 +62,8 @@ export const COMMANDS: readonly CommandName[] = [
   'prompt',
   'wait',
   'kill',
+  'review',
+  'clean',
   'install-skill',
 ];
 
@@ -101,6 +108,10 @@ export const defaultDeps = (): CliDeps => {
     skillFs: fsSkillFileSystem,
     makeDirectory: async (path) => {
       await mkdir(path, { recursive: true });
+    },
+    readTranscript: async (cwd, sessionId) => {
+      const path = buildTranscriptPath(home, cwd, sessionId);
+      return path === null ? null : readTail(path, OUTPUT_TAIL_BYTES).catch(() => null);
     },
     readLastReport: (agent) => readLastReport(agent, { home }),
     readLogs: (agent, lines) => readLogs(agent, { lines }),
@@ -319,6 +330,19 @@ const runOperation = async (
         return usage('使い方: cuse kill <名前> --reason "<理由>"', flags.json);
       }
       return fromOutcome(await runKill({ name, reason: flags.reason ?? '' }, deps), flags.json);
+    }
+    case 'review': {
+      const [name] = args;
+      if (name === undefined || args.length > 1) {
+        return usage('使い方: cuse review <名前>', flags.json);
+      }
+      return fromOutcome(await runReview({ name }, deps), flags.json);
+    }
+    case 'clean': {
+      if (args.length > 0) {
+        return usage('使い方: cuse clean（終わった配下をまとめて片付けます）', flags.json);
+      }
+      return fromOutcome(await runClean({}, deps), flags.json);
     }
     case 'install-skill': {
       const result = await installSkill(await deps.readBundled(SKILL_SOURCE), {

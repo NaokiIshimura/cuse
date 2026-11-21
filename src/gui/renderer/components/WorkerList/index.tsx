@@ -15,6 +15,10 @@ interface WorkerListProps {
   readonly workerIds: ReadonlySet<string>;
   readonly onOpen: (agent: Agent) => void;
   readonly onStop: (agent: Agent) => void;
+  /** 終わった配下を片付ける（台帳の配下だけ。未 commit / 未 push は残す） */
+  readonly onClean: () => void;
+  /** 片付けた結果（直近の 1 回） */
+  readonly cleanMessage: string | null;
 }
 
 /** 空のときの説明。第 1 段階は台帳が無いので、全セッション表示への切り替えを案内する。 */
@@ -58,6 +62,8 @@ export const WorkerList = ({
   workerIds,
   onOpen,
   onStop,
+  onClean,
+  cleanMessage,
 }: WorkerListProps) => (
   <section className="worker-list" aria-label={scope === 'all' ? '全セッション' : '配下'}>
     <header className="pane-header">
@@ -122,7 +128,24 @@ export const WorkerList = ({
 
         {finished.length === 0 ? null : (
           <>
-            <h2 className="worker-list__done-title">DONE</h2>
+            <div className="worker-list__done-header">
+              <h2 className="worker-list__done-title">DONE</h2>
+              {finished.some((agent) => workerIds.has(agent.sessionId)) ? (
+                <button
+                  type="button"
+                  className="link-button link-button--small"
+                  onClick={onClean}
+                  title="終わった配下を claude rm で片付けます。commit していない変更や push していない commit があるものは残します"
+                >
+                  片付ける
+                </button>
+              ) : null}
+            </div>
+            {cleanMessage === null ? null : (
+              <p className="worker-list__clean-message" role="status">
+                {cleanMessage}
+              </p>
+            )}
             <ul className="worker-list__done">
               {finished.map((agent) => (
                 <li key={agent.sessionId} className="done-row">

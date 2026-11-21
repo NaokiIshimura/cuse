@@ -73,6 +73,8 @@ const makeBridge = (snapshot: Snapshot) => {
   let ensured = 0;
   let chosen = 0;
   const trusted: { tabId: string }[] = [];
+  let cleanCalls = 0;
+  let openSessionListener: ((sessionId: string) => void) | null = null;
   const bridge: CuseBridge = {
     getEnvironment: async () => environment,
     getSnapshot: async () => snapshot,
@@ -99,12 +101,30 @@ const makeBridge = (snapshot: Snapshot) => {
       chosen += 1;
       return { kind: 'starting' };
     },
+    cleanWorkers: async () => {
+      cleanCalls += 1;
+      return { ok: true, message: '片付けました: lint-fix', cleaned: 1 };
+    },
+    onOpenSession: (listener) => {
+      openSessionListener = listener;
+      return () => undefined;
+    },
     openTrustTerminal: async (request) => {
       trusted.push({ tabId: request.tabId });
       return { ok: true };
     },
   };
-  return { bridge, opened, closed, stopped, trusted, ensured: () => ensured, chosen: () => chosen };
+  return {
+    bridge,
+    opened,
+    closed,
+    stopped,
+    trusted,
+    ensured: () => ensured,
+    chosen: () => chosen,
+    cleanCalls: () => cleanCalls,
+    openSession: (sessionId: string) => openSessionListener?.(sessionId),
+  };
 };
 
 beforeEach(() => {
@@ -263,6 +283,37 @@ describe('App', () => {
     const second = render(<App environment={environment} bridge={makeBridge(leaderSnapshot).bridge} />);
     await flush();
     expect(second.container.querySelector('.first-request')).toBeNull();
+  });
+
+  it('DONE に台帳の配下があれば「片付ける」を出し、結果を見せる', async () => {
+    const snapshot: Snapshot = {
+      ...leaderSnapshot,
+      agents: {
+        ok: true,
+        agents: [
+          makeAgent({ name: 'cuse-leader', sessionId: 'leader-session', id: 'leader01', state: 'waiting' }),
+          makeAgent({ name: 'tests', sessionId: 'tests-session', id: 'tests-id', state: 'done' }),
+        ],
+      },
+    };
+    const { bridge, cleanCalls } = makeBridge(snapshot);
+    const { container, getByText } = render(<App environment={environment} bridge={bridge} />);
+    await flush();
+    fireEvent.click(getByText('片付ける'));
+    await flush();
+    expect(cleanCalls()).toBe(1);
+    expect(container.querySelector('.worker-list__clean-message')?.textContent).toBe('片付けました: lint-fix');
+  });
+
+  it('OS 通知を押したら、その配下を中央に開く', async () => {
+    const { bridge, opened, openSession } = makeBridge(leaderSnapshot);
+    render(<App environment={environment} bridge={bridge} />);
+    await flush();
+    act(() => {
+      openSession('tests-session');
+    });
+    await flush();
+    expect(opened.map((request) => request.sessionId)).toContain('tests-session');
   });
 
   it('承認のボタンは置かない（「開いて承認する」は開くだけ）', async () => {

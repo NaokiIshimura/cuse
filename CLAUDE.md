@@ -11,9 +11,12 @@ cuse は、1 つの Claude Code セッション（指揮役）が、同じマシ
 そのため `.app` は asar にしない（`--no-asar`）。CLI が読む `node_modules/meow` と、端末の `node_modules/node-pty` を `.app` に入れる。
 何をどう作るかは `docs/HANDOFF.md`、設計の理由は `docs/cuse 企画書（単体ツール版）.md` にある。
 
-いまは **第 2 段階（v0.2.0、指揮）**。`start` / `spawn` / `prompt` / `wait` / `kill`、台帳の書き込み、指揮役のトークン、
-cuse スキルと心得、ウィンドウ中央の埋め込み端末まで。第 3 段階（`review` / `clean`、プレビュー、OS 通知）は、
-Naoki が第 2 段階を確かめてから始める。
+いまは **第 3 段階（v0.3、回収と片付け）の途中**。第 2 段階までに加えて `review` / `clean`、承認待ちの OS 通知まで入った。
+右のプレビューはこの後に入れる。第 4 段階（MCP サーバー版など）は、Naoki が第 3 段階を確かめてから始める。
+
+`clean` は `src/core/gitStatus.ts` の `isSafeToClean` が true のものだけを `claude rm` する。分からないこと
+（リモートが無くて push したか確かめられない、など）は「残す」側に倒す。配下が作業した場所は、`claude agents` の `cwd`
+ではなく transcript の最後の `cwd`（worktree へ移った後の場所）で見る（`findLastCwd`）。
 
 ## 作業ルール
 

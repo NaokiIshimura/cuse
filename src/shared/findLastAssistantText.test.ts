@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { findLastAssistantText } from './parseTranscript.js';
+import { findLastAssistantText, findLastCwd } from './parseTranscript.js';
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'test', 'fixtures');
 
@@ -59,5 +59,21 @@ describe('findLastAssistantText', () => {
     expect(findLastAssistantText(chunk)).toBe(
       'テストを 3 件追加しました。\n- npm test は通っています\n- 差分は src/notify.test.ts だけです',
     );
+  });
+});
+
+describe('findLastCwd', () => {
+  it('最後に記録された作業ディレクトリ（worktree へ移った後の場所）を返す', () => {
+    const chunk = [
+      JSON.stringify({ type: 'user', cwd: '/w/app' }),
+      JSON.stringify({ type: 'assistant', cwd: '/w/app/.claude/worktrees/tests' }),
+      JSON.stringify({ type: 'assistant', cwd: '/elsewhere', isSidechain: true }),
+      '{',
+    ].join('\n');
+    expect(findLastCwd(chunk)).toBe('/w/app/.claude/worktrees/tests');
+  });
+
+  it('無ければ undefined', () => {
+    expect(findLastCwd('')).toBeUndefined();
   });
 });

@@ -18,9 +18,10 @@ cuse は、指揮役が配下の Claude Code セッションを動かすため�
 3. `cuse wait <名前…>` で待つ。返ってきた「誰が何のために止まったか」で次を決める。
    - 承認待ち（`approval`）: 人に伝え、cuse のウィンドウで承認してもらう。あなたは承認しない。
    - 入力待ち（`input`）: `cuse output <名前>` で質問を読む。方針の範囲内なら `SendMessage` で答え、方針に関わるなら人に聞く。
-   - 完了（`done`）: `cuse output <名前>` で報告を読み、差分を確かめて人に伝える。
+   - 完了（`done`）: `cuse review <名前>` で差分・ブランチ・PR・最後の報告を見て、確かめてから人に伝える。
 4. 直しが要れば、動いている配下には `SendMessage`、止まった配下には `cuse prompt <名前> "<指示>"`。
 5. 要らなくなった配下は `cuse kill <名前> --reason "<理由>"`。
+6. 人が PR を取り込んだら `cuse clean` で終わった配下を片付ける（commit / push していない作業がある配下は残る）。
 
 ## コマンド
 
@@ -33,6 +34,8 @@ cuse は、指揮役が配下の Claude Code セッションを動かすため�
 | `cuse output <名前> [--lines N] [--json]` | 最後の報告（最後の assistant 発言）と `claude logs` の末尾 |
 | `cuse prompt <名前> "<指示>" [--json]` | 止まった配下に `claude --resume` で続きを頼む。動いている配下なら送らずに「SendMessage で送る」よう返す（`delivered: false`） |
 | `cuse kill <名前> --reason "<理由>" [--json]` | `claude stop` で止め、理由を台帳に残す。変更や worktree は消さない |
+| `cuse review <名前> [--json]` | 作業した場所（worktree）・ブランチ・取り込み先との差分・commit していない変更・push していない commit・PR・最後の報告。`keep` に「片付けると失うもの」が入る |
+| `cuse clean [--json]` | 終わった配下を `claude rm` で片付ける。commit していない変更や push していない commit がある配下は残し、理由を返す。動いている配下には触らない |
 
 ## 注意
 

@@ -232,6 +232,16 @@ describe('runCli（操作系）', () => {
     expect(world.ledger.workers[0]?.endReason).toBe('終わったため');
   });
 
+  it('review と clean を呼べる', async () => {
+    const world = leaderWorld();
+    await runCli('spawn', ['テストを追加して', 'tests'], flags(), cliDeps(world));
+    world.agents[0] = { ...world.agents[0], state: 'done', status: undefined, pid: undefined } as never;
+    const reviewed = await runCli('review', ['tests'], flags({ json: true }), cliDeps(world));
+    expect(parse(reviewed.stdout)).toMatchObject({ name: 'tests', keep: null });
+    const cleaned = await runCli('clean', [], flags({ json: true }), cliDeps(world));
+    expect(parse(cleaned.stdout)).toMatchObject({ cleaned: [{ name: 'tests' }] });
+  });
+
   it('指揮役でなければ spawn は denied', async () => {
     const world = createFakeWorld();
     const result = await runCli('spawn', ['t', 'tests'], flags({ json: true }), cliDeps(world));

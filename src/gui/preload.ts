@@ -46,6 +46,16 @@ const bridge: CuseBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.stopWorker, sessionId, reason),
   ensureLeader: () => ipcRenderer.invoke(IPC_CHANNELS.ensureLeader),
   chooseLeaderFolder: () => ipcRenderer.invoke(IPC_CHANNELS.chooseLeaderFolder),
+  cleanWorkers: () => ipcRenderer.invoke(IPC_CHANNELS.cleanWorkers),
+  onOpenSession: (listener) => {
+    const handler = (_event: IpcRendererEvent, sessionId: string) => {
+      listener(sessionId);
+    };
+    ipcRenderer.on(IPC_CHANNELS.openSession, handler);
+    return () => {
+      ipcRenderer.off(IPC_CHANNELS.openSession, handler);
+    };
+  },
   openTrustTerminal: (request: OpenTrustTerminalRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.openTrustTerminal, request),
 };
