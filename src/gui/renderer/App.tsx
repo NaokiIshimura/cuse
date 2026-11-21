@@ -5,7 +5,7 @@ import type { Agent } from '../../types/agent.js';
 import type { CuseBridge, GuiEnvironment } from '../ipc.js';
 import type { LeaderStartup } from '../leaderStartup.js';
 import { CenterPane, type TerminalTab } from './components/CenterPane/index.js';
-import { Placeholder } from './components/Placeholder/index.js';
+import { PreviewPane } from './components/PreviewPane/index.js';
 import { StopDialog } from './components/StopDialog/index.js';
 import { TopBar } from './components/TopBar/index.js';
 import { WorkerList } from './components/WorkerList/index.js';
@@ -43,6 +43,8 @@ export const App = ({ environment, bridge }: AppProps) => {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [stopping, setStopping] = useState<Agent | null>(null);
   const [cleanMessage, setCleanMessage] = useState<string | null>(null);
+  // 右のプレビュー: 既定は中央で見ているセッションを追いかける。固定したらそのセッションのまま
+  const [pinnedPreview, setPinnedPreview] = useState<{ readonly sessionId: string; readonly name: string } | null>(null);
   const reducedMotion = useReducedMotion();
   const frame = useAnimationTick(ANIMATION_INTERVAL_MS, !reducedMotion);
 
@@ -98,6 +100,8 @@ export const App = ({ environment, bridge }: AppProps) => {
     activeTabId !== null && tabs.some((tab) => tab.tabId === activeTabId)
       ? activeTabId
       : (tabs[0]?.tabId ?? null);
+
+  const shownTab = tabs.find((tab) => tab.tabId === shownTabId);
 
   const openAgent = useCallback(
     (agent: Agent) => {
@@ -199,10 +203,18 @@ export const App = ({ environment, bridge }: AppProps) => {
             void bridge.chooseLeaderFolder();
           }}
         />
-        <Placeholder
-          title="PREVIEW"
-          stage="第 3 段階で入ります"
-          description="セッションに出てきたファイル・差分・画像・Web サイトをここに表示します。"
+        <PreviewPane
+          bridge={bridge}
+          sessionId={pinnedPreview?.sessionId ?? shownTab?.sessionId ?? null}
+          sessionName={pinnedPreview?.name ?? shownTab?.title ?? null}
+          following={pinnedPreview === null}
+          onToggleFollow={() => {
+            setPinnedPreview((current) =>
+              current !== null || shownTab === undefined
+                ? null
+                : { sessionId: shownTab.sessionId, name: shownTab.title },
+            );
+          }}
         />
       </main>
       <footer className="footer">

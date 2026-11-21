@@ -7,6 +7,11 @@ import { spawn as spawnPty } from 'node-pty';
 import { runClean } from '../commands/clean.js';
 import { runKill } from '../commands/kill.js';
 import { approvalNotices } from '../shared/approvalNotices.js';
+import { extractPreviewItems, previewKey, type PreviewItem } from '../shared/previewItems.js';
+import { buildTranscriptPath } from '../shared/transcriptPath.js';
+import { readPreviewContent } from '../core/previewContent.js';
+import { readTail } from '../core/readOutput.js';
+import { execFileRunner } from '../core/runCommand.js';
 import type { Agent } from '../types/agent.js';
 import { runStart } from '../commands/start.js';
 import { MAX_WORKERS } from '../config/defaults.js';
@@ -25,6 +30,7 @@ import {
   type OpenTerminalResult,
   type CleanWorkersResult,
   type OpenTrustTerminalRequest,
+  type PreviewResult,
   type Snapshot,
   type StopWorkerResult,
 } from './ipc.js';
@@ -184,6 +190,88 @@ const notifyApprovals = (agents: readonly Agent[], ledger: Ledger | null): void 
     notification.show();
   }
 };
+
+/** プレビューのために transcript の末尾から読む量。古いものまで拾いすぎないよう、表示の 512KB と同じにする。 */
+const PREVIEW_TRANSCRIPT_BYTES = 512 * 1024;
+
+/**
+ * セッションに出てきたファイル・URL。
+ * セッションの作業ディレクトリ（transcript の置き場所を決める）は、一覧か台帳から引く。
+ */
+const previewItemsOf = async (sessionId: string): Promise<PreviewItem[]> => {
+  if (typeof sessionId !== 'string' || sessionId === '') {
+    return [];
+  }
+  let cwd = lastAgents?.find((agent) => agent.sessionId === sessionId)?.cwd;
+  if (cwd === undefined) {
+    const ledger = await readLedger({ home });
+    if (ledger.kind === 'ok') {
+      cwd =
+        ledger.ledger.leader?.sessionId === sessionId
+          ? ledger.ledger.leader.cwd
+          : ledger.ledger.workers.find((worker) => worker.sessionId === sessionId)?.cwd;
+    }
+  }
+  const path = cwd === undefined ? null : buildTranscriptPath(home, cwd, sessionId);
+  if (path === null) {
+    return [];
+  }
+  const chunk = await readTail(path, PREVIEW_TRANSCRIPT_BYTES).catch(() => '');
+  return extractPreviewItems(chunk);
+};
+
+ipcMain.handle(IPC_CHANNELS.getPreviewItems, (_event, sessionId: unknown) =>
+  previewItemsOf(typeof sessionId === 'string' ? sessionId : ''),
+);
+
+/**
+ * プレビューの中身。renderer から来た鍵をそのまま信じず、そのセッションに出てきたものかを
+ * transcript から確かめてから読む（セッションに出ていないファイルや URL は開かない）。
+ */
+ipcMain.handle(
+  IPC_CHANNELS.readPreview,
+  async (_event, sessionId: unknown, key: unknown, reveal: unknown): Promise<PreviewResult> => {
+    const items = await previewItemsOf(typeof sessionId === 'string' ? sessionId : '');
+    const item = items.find((candidate) => previewKey(candidate) === key);
+    if (item === undefined) {
+      return { kind: 'unavailable', message: 'このセッションに出てきたものではないので開きません。' };
+    }
+    if (item.kind === 'url') {
+      return { kind: 'url', url: item.url };
+    }
+    return readPreviewContent(item, { reveal: reveal === true, runner: execFileRunner });
+  },
+);
+
+ipcMain.handle(IPC_CHANNELS.openExternalUrl, async (_event, sessionId: unknown, url: unknown) => {
+  const items = await previewItemsOf(typeof sessionId === 'string' ? sessionId : '');
+  if (typeof url !== 'string' || !items.some((item) => item.kind === 'url' && item.url === url)) {
+    return false;
+  }
+  await shell.openExternal(url);
+  return true;
+});
+
+/**
+ * プレビューの Web 表示（<webview>）を隔離する。Node 連携なし・preload なし・専用のセッション領域
+ * （保存しない）で、http(s) だけを開く。新しいウィンドウは開かず、普段のブラウザにも渡さない。
+ */
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('will-attach-webview', (attachEvent, webPreferences, params) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    params.partition = 'cuse-preview';
+    if (!/^https?:\/\//i.test(params.src ?? '')) {
+      attachEvent.preventDefault();
+    }
+  });
+  if (contents.getType() === 'webview') {
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  }
+});
 
 /** 人が終わった配下を片付ける。トークンは要らないが、台帳の配下だけ・未 commit / 未 push は残す（runClean）。 */
 ipcMain.handle(IPC_CHANNELS.cleanWorkers, async (): Promise<CleanWorkersResult> => {
@@ -370,6 +458,8 @@ const createWindow = async (): Promise<void> => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // 右のプレビューの Web 表示に使う。中身は will-attach-webview で隔離する
+      webviewTag: true,
     },
   });
 

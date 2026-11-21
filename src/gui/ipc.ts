@@ -1,6 +1,8 @@
 import type { ClaudeVersionCheck } from '../core/claudeVersion.js';
 import type { FetchAgentsResult } from '../core/fetchAgents.js';
 import type { ReadLedgerResult } from '../core/ledger.js';
+import type { PreviewContent } from '../core/previewContent.js';
+import type { PreviewItem } from '../shared/previewItems.js';
 import type { LeaderStartup } from './leaderStartup.js';
 
 /**
@@ -39,6 +41,12 @@ export const IPC_CHANNELS = {
   cleanWorkers: 'workers:clean',
   /** 通知を押したときに、そのセッションを開いてもらう（main → renderer） */
   openSession: 'session:open',
+  /** セッションに出てきたファイル・URL の一覧 */
+  getPreviewItems: 'preview:items',
+  /** プレビューの中身を読む（セッションに出てきたものだけ） */
+  readPreview: 'preview:read',
+  /** セッションに出てきた URL を普段のブラウザで開く */
+  openExternalUrl: 'preview:openExternal',
 } as const;
 
 /** 起動時に 1 回だけ取る環境。 */
@@ -83,6 +91,11 @@ export type OpenTerminalResult =
     }
   | { readonly ok: false; readonly message: string };
 
+/** プレビューの中身。ファイルなら PreviewContent、URL なら隔離したブラウザ表示で開く URL。 */
+export type PreviewResult =
+  | PreviewContent
+  | { readonly kind: 'url'; readonly url: string };
+
 export type CleanWorkersResult =
   | { readonly ok: true; readonly message: string; readonly cleaned: number }
   | { readonly ok: false; readonly message: string };
@@ -109,6 +122,15 @@ export interface CuseBridge {
    * どのフォルダかは main が決める（renderer からフォルダは渡さない）
    */
   readonly cleanWorkers: () => Promise<CleanWorkersResult>;
+  /** セッションに出てきたファイル・URL（新しい順） */
+  readonly getPreviewItems: (sessionId: string) => Promise<readonly PreviewItem[]>;
+  /**
+   * プレビューの中身を読む。`key` は previewKey。main がそのセッションに出てきたものかを確かめ、
+   * そうでなければ読まない。`reveal` は `.env` などの中身を見ると人が決めたとき
+   */
+  readonly readPreview: (sessionId: string, key: string, reveal: boolean) => Promise<PreviewResult>;
+  /** セッションに出てきた URL を普段のブラウザで開く。出てきていない URL は開かない */
+  readonly openExternalUrl: (sessionId: string, url: string) => Promise<boolean>;
   /** 通知を押したときに開くセッションを受け取る。購読を解除する関数を返す */
   readonly onOpenSession: (listener: (sessionId: string) => void) => () => void;
   readonly openTrustTerminal: (
