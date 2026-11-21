@@ -42,7 +42,7 @@ const results: Record<string, PreviewResult> = {
 describe('PreviewPane', () => {
   it('追いかけ中は、いちばん新しく出てきたものを開き、書き換えたファイルは差分を見せる', async () => {
     const { bridge, reads } = makeBridge(items, results);
-    const { container } = render(
+    const { container, getByText } = render(
       <PreviewPane bridge={bridge} sessionId="s1" sessionName="tests" following onToggleFollow={() => undefined} />,
     );
     await flush();
@@ -51,8 +51,51 @@ describe('PreviewPane', () => {
     expect([...container.querySelectorAll('.preview-diff--add')].map((line) => line.textContent)).toEqual(['+new']);
     expect(container.querySelector('.preview__follow')?.textContent).toBe('● 追いかけ中');
 
-    fireEvent.click(container.querySelector('.preview__toolbar button') as HTMLElement);
+    fireEvent.click(getByText('元の文字'));
     expect(container.querySelector('.preview-text__line')?.textContent).toBe('1new');
+    // TypeScript として色を付ける（HTML を差し込まず、断片を部品として並べる）
+    expect(container.querySelector('.preview-text')?.className).toContain('language-typescript');
+  });
+
+  it('Markdown は整えて見せ、HTML・リンク・画像は持ち込まない。元の文字にも切り替えられる', async () => {
+    const md = [
+      '# 見出し',
+      '',
+      '| 要素 | 内容 |',
+      '| --- | --- |',
+      '| 表 | 左寄せ |',
+      '',
+      '<script>alert(1)</script><b>太字のタグ</b>',
+      '',
+      '[リンク](https://example.com) ![図](/etc/passwd)',
+      '',
+      '```ts',
+      'const a = 1;',
+      '```',
+    ].join('\n');
+    const mdItems: PreviewItem[] = [{ kind: 'file', path: '/w/app/README.md', edited: false, at: 3, tool: 'Read' }];
+    const { bridge } = makeBridge(mdItems, {
+      'file:/w/app/README.md': { kind: 'text', text: md, truncated: false, diff: null },
+    });
+    const { container, getByText } = render(
+      <PreviewPane bridge={bridge} sessionId="s1" sessionName="tests" following onToggleFollow={() => undefined} />,
+    );
+    await flush();
+    await flush();
+    const view = container.querySelector('.preview-md') as HTMLElement;
+    expect(view.querySelector('h1')?.textContent).toBe('見出し');
+    expect(view.querySelector('table td')?.textContent).toBe('表');
+    expect(view.querySelector('script')).toBeNull();
+    expect(view.querySelector('b')).toBeNull();
+    expect(view.querySelector('a')).toBeNull();
+    expect(view.querySelector('img')).toBeNull();
+    expect(view.querySelector('.preview-md__link')?.getAttribute('title')).toBe('https://example.com');
+    expect(view.querySelector('.preview-md__image')?.textContent).toBe('[画像: 図]');
+    expect(view.querySelector('.preview-md__code .hljs-keyword')?.textContent).toBe('const');
+
+    fireEvent.click(getByText('元の文字'));
+    expect(container.querySelector('.preview-md')).toBeNull();
+    expect(container.querySelector('.preview-text__line')?.textContent).toBe('1# 見出し');
   });
 
   it('履歴から開ける。URL は隔離したブラウザ表示と「ブラウザで開く」', async () => {

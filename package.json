@@ -1,6 +1,6 @@
 {
   "name": "cuse",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "1 つの Claude Code セッション（指揮役）が、同じマシンのほかの Claude Code セッション（配下）を見守り・指揮するための CLI とデスクトップアプリ",
   "type": "module",
   "main": "dist/gui/main.js",
@@ -54,7 +54,10 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "jsdom": "^29.1.1",
+    "lowlight": "^3.3.0",
     "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vitest": "^4.1.11"
