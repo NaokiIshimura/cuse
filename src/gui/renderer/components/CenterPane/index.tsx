@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { LEADER_BATON_COLUMN, getFrame, getLeaderFrame } from '../../../../shared/characters.js';
+import { LEADER_GLOVE_WIDTH, getFrame, getLeaderFrame, isBatonRow } from '../../../../shared/characters.js';
 import { STATE_LABELS_JA } from '../../../../shared/stateLabels.js';
 import type { Agent } from '../../../../types/agent.js';
 import type { CuseBridge } from '../../../ipc.js';
@@ -8,18 +8,19 @@ import type { TerminalLink } from '../../../../shared/terminalLinks.js';
 import { TerminalView } from '../TerminalView/index.js';
 
 /**
- * 指揮役の AA。指揮棒の桁（いちばん左）だけ色を変える（身体と同じ色だと、指揮棒に見えないため）。
+ * 指揮役の AA。指揮棒のある行の左 2 桁（棒と、それを握る手）だけ白くする（白い手袋。
+ * 身体と同じ色だと指揮棒に見えないため。文字の中では色を分けられないので、手も白くなる）。
  */
 const LeaderAa = ({ text }: { readonly text: string }) => (
   <>
     {text.split('\n').map((row, index, rows) => {
       const cells = [...row];
+      const glove = isBatonRow(row) ? LEADER_GLOVE_WIDTH : 0;
       return (
         // 行の中身はフレームごとに変わるので、行番号を鍵にする
         <span key={index}>
-          {cells.slice(0, LEADER_BATON_COLUMN).join('')}
-          <span className="character__baton">{cells[LEADER_BATON_COLUMN] ?? ' '}</span>
-          {cells.slice(LEADER_BATON_COLUMN + 1).join('')}
+          {glove === 0 ? null : <span className="character__baton">{cells.slice(0, glove).join('')}</span>}
+          {cells.slice(glove).join('')}
           {index < rows.length - 1 ? '\n' : ''}
         </span>
       );
