@@ -1,10 +1,29 @@
 import { useCallback } from 'react';
-import { getFrame } from '../../../../shared/characters.js';
+import { CHARACTER_WIDTH, getFrame, getLeaderFrame } from '../../../../shared/characters.js';
 import { STATE_LABELS_JA } from '../../../../shared/stateLabels.js';
 import type { Agent } from '../../../../types/agent.js';
 import type { CuseBridge } from '../../../ipc.js';
 import type { LeaderStartup } from '../../../leaderStartup.js';
 import { TerminalView } from '../TerminalView/index.js';
+
+/**
+ * 指揮役の AA。右端の桁の指揮棒だけ色を変える（身体と同じ色だと、しっぽに見えるため）。
+ */
+const LeaderAa = ({ text }: { readonly text: string }) => (
+  <>
+    {text.split('\n').map((row, index, rows) => {
+      const cells = [...row];
+      return (
+        // 行の中身はフレームごとに変わるので、行番号を鍵にする
+        <span key={index}>
+          {cells.slice(0, CHARACTER_WIDTH).join('')}
+          <span className="character__baton">{cells.slice(CHARACTER_WIDTH).join('')}</span>
+          {index < rows.length - 1 ? '\n' : ''}
+        </span>
+      );
+    })}
+  </>
+);
 
 /** 中央のタブ 1 つ。 */
 export interface TerminalTab {
@@ -182,7 +201,7 @@ export const CenterPane = ({
                   : 'character character--large'
               }
             >
-              {getFrame(state, frame)}
+              {active.role === 'leader' ? <LeaderAa text={getLeaderFrame(state, frame)} /> : getFrame(state, frame)}
             </pre>
             <div className="center-pane__who">
               <div className="center-pane__name">

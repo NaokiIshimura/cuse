@@ -164,6 +164,45 @@ export const getMiniFrame = (frame: number): string => {
   return MINI_FRAMES[index] ?? '';
 };
 
+/*
+ * 指揮役（cuse-leader）の AA。cuse だけのもの（cc-park には無い）。
+ *
+ * 配下と同じ Clawd の右側（桁 9）に 1 桁足し、指揮棒を持たせる。
+ * - 左手（桁 8）を上げているときは、手の右下から右上へ伸びる棒 `▞`（左下と右上の象限）を頭の行に置く
+ * - 手を下ろしているときは、身体の端から右下へ伸びる棒 `▚`（左上と右下の象限）を身体の行に置く
+ * どちらも手・身体の端と象限が隣り合い、棒が離れて見えない。
+ * 作業中は、歩く代わりに指揮棒を振る（上げる → 下ろす）。
+ */
+
+/** 指揮役の AA の桁数（配下より指揮棒の 1 桁ぶん広い）。 */
+export const LEADER_WIDTH = CHARACTER_WIDTH + 1;
+
+const BATON_UP = '▞';
+const BATON_DOWN = '▚';
+
+/** 配下の 1 フレームに指揮棒を足す。左手を上げていれば棒も上げる。 */
+const withBaton = (base: string): string => {
+  const [head = '', body = '', legs = ''] = base.split('\n');
+  const raised = head[CHARACTER_WIDTH - 1] === RAISED;
+  return [
+    `${head}${raised ? BATON_UP : ' '}`,
+    `${body}${raised ? ' ' : BATON_DOWN}`,
+    `${legs} `,
+  ].join('\n');
+};
+
+/** 作業中の指揮役は、指揮棒を上げ下げする。 */
+const LEADER_CONDUCTING: readonly string[] = [withBaton(frame('leftHand')), withBaton(frame('down'))];
+
+/** 指揮役の、状態とフレーム番号に対応する AA。 */
+export const getLeaderFrame = (state: CharacterState, frame: number): string => {
+  if (state === 'working') {
+    const index = ((frame % LEADER_CONDUCTING.length) + LEADER_CONDUCTING.length) % LEADER_CONDUCTING.length;
+    return LEADER_CONDUCTING[index] ?? '';
+  }
+  return withBaton(getFrame(state, frame));
+};
+
 /** 状態に対応する見た目を取得する。 */
 export const getAppearance = (state: CharacterState): CharacterAppearance =>
   CHARACTERS[state] ?? CHARACTERS.unknown;
