@@ -1,0 +1,378 @@
+// 写し元: cc-park `src/core/fetchAgents.test.ts` @ `d1f0f2d`（v0.25.0）
+import { describe, expect, it, vi } from 'vitest';
+import type { Agent } from '../types/agent.js';
+import type { ReadSessionMetaOptions } from './readSessionMeta.js';
+import {
+  buildArgs,
+  createLaunchAppCache,
+  fetchAgents,
+  type CommandRunner,
+} from './fetchAgents.js';
+
+const jsonFixture = JSON.stringify([
+  {
+    pid: 16460,
+    cwd: '/Users/naoki',
+    kind: 'interactive',
+    startedAt: 1789918159032,
+    sessionId: '40e18e35',
+    name: 'cc-park',
+    status: 'busy',
+  },
+]);
+
+const runnerReturning = (stdout: string): CommandRunner => vi.fn(async () => stdout);
+const runnerRejecting = (error: unknown): CommandRunner =>
+  vi.fn(async () => {
+    throw error;
+  });
+
+describe('buildArgs', () => {
+  it('既定では agents --json のみ', () => {
+    expect(buildArgs({})).toEqual(['agents', '--json']);
+  });
+
+  it('all 指定で --all を付ける', () => {
+    expect(buildArgs({ all: true })).toEqual(['agents', '--json', '--all']);
+  });
+
+  it('all が false なら --all を付けない', () => {
+    expect(buildArgs({ all: false })).toEqual(['agents', '--json']);
+  });
+
+  it('cwd 指定で --cwd を付ける', () => {
+    expect(buildArgs({ cwd: '/tmp' })).toEqual(['agents', '--json', '--cwd', '/tmp']);
+  });
+
+  it('cwd が空文字なら付けない', () => {
+    expect(buildArgs({ cwd: '' })).toEqual(['agents', '--json']);
+  });
+
+  it('all と cwd を同時に指定できる', () => {
+    expect(buildArgs({ all: true, cwd: '/tmp' })).toEqual([
+      'agents',
+      '--json',
+      '--all',
+      '--cwd',
+      '/tmp',
+    ]);
+  });
+});
+
+describe('fetchAgents', () => {
+  it('正常な JSON を正規化して返す', async () => {
+    const result = await fetchAgents({ runner: runnerReturning(jsonFixture) });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0]?.state).toBe('working');
+    }
+  });
+
+  it('ランナーへコマンドと引数を渡す', async () => {
+    const runner = runnerReturning('[]');
+    await fetchAgents({ runner, all: true, timeoutMs: 1234 });
+    expect(runner).toHaveBeenCalledWith(
+      'claude',
+      ['agents', '--json', '--all'],
+      { timeoutMs: 1234, signal: undefined },
+    );
+  });
+
+  it('command オプションで実行コマンドを差し替えられる', async () => {
+    const runner = runnerReturning('[]');
+    await fetchAgents({ runner, command: '/usr/local/bin/claude' });
+    expect(runner).toHaveBeenCalledWith(
+      '/usr/local/bin/claude',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('不正な JSON は parse エラーを返す', async () => {
+    const result = await fetchAgents({ runner: runnerReturning('not json') });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'parse' } });
+  });
+
+  it('配列でない JSON は parse エラーを返す', async () => {
+    const result = await fetchAgents({ runner: runnerReturning('{"a":1}') });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'parse' } });
+  });
+
+  it('ENOENT は not-found エラーを返す', async () => {
+    const error = Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
+    const result = await fetchAgents({ runner: runnerRejecting(error) });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'not-found' } });
+  });
+
+  it('タイムアウト（killed）は timeout エラーを返す', async () => {
+    const error = Object.assign(new Error('timeout'), { killed: true });
+    const result = await fetchAgents({ runner: runnerRejecting(error) });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'timeout' } });
+  });
+
+  it('SIGTERM も timeout エラーとして扱う', async () => {
+    const error = Object.assign(new Error('killed'), { signal: 'SIGTERM' });
+    const result = await fetchAgents({ runner: runnerRejecting(error) });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'timeout' } });
+  });
+
+  it('AbortError は aborted エラーを返す', async () => {
+    const error = Object.assign(new Error('aborted'), { name: 'AbortError' });
+    const result = await fetchAgents({ runner: runnerRejecting(error) });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'aborted' } });
+  });
+
+  it('その他の失敗は exit エラーを返す', async () => {
+    const result = await fetchAgents({ runner: runnerRejecting(new Error('exit 1')) });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'exit', message: 'exit 1' } });
+  });
+
+  it('Error 以外が投げられても文字列化して返す', async () => {
+    const result = await fetchAgents({ runner: runnerRejecting('壊れた') });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'exit' } });
+  });
+});
+
+// execFileRunner 自体の検証は runCommand.test.ts 側で行う
+describe('既定ランナー', () => {
+  it('既定ランナー経由でも claude コマンド未検出を Result で返す', async () => {
+    const result = await fetchAgents({ command: 'cc-park-no-such-command' });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'not-found' } });
+  });
+});
+
+describe('transcript 由来の付加情報', () => {
+  const raw = [
+    { kind: 'interactive', sessionId: 'a', name: 'alpha', cwd: '/tmp/x', status: 'busy' },
+    { kind: 'interactive', sessionId: 'b', name: 'beta', cwd: '/tmp/y', status: 'idle' },
+  ];
+  const runner = runnerReturning(JSON.stringify(raw));
+
+  it('既定では transcript を読まない', async () => {
+    const metaReader = vi.fn(async () => ({ lastPrompt: 'x', tokens: undefined, subagents: [] }));
+    const result = await fetchAgents({ runner, metaReader });
+
+    expect(metaReader).not.toHaveBeenCalled();
+    expect(result.ok && result.agents[0]?.meta).toBeUndefined();
+  });
+
+  it('meta を有効にすると全セッションぶん合成する', async () => {
+    const metaReader = vi.fn(async (agent: Agent) => ({
+      lastPrompt: `prompt-${agent.sessionId}`,
+      tokens: undefined,
+      subagents: [],
+    }));
+    const result = await fetchAgents({ runner, meta: true, metaReader });
+
+    expect(metaReader).toHaveBeenCalledTimes(2);
+    expect(result.ok && result.agents.map((item) => item.meta?.lastPrompt)).toEqual([
+      'prompt-a',
+      'prompt-b',
+    ]);
+  });
+
+  it('home と contextLimit を読み取りへ渡す', async () => {
+    const metaReader = vi.fn(async (_agent: Agent, _options: ReadSessionMetaOptions) => undefined);
+    await fetchAgents({
+      runner,
+      meta: true,
+      metaReader,
+      home: '/Users/naoki',
+      contextLimit: 200_000,
+    });
+
+    expect(metaReader.mock.calls[0]?.[1]).toEqual({
+      home: '/Users/naoki',
+      contextLimit: 200_000,
+    });
+  });
+
+  it('home 未指定なら既定の解決に任せる', async () => {
+    const metaReader = vi.fn(async (_agent: Agent, _options: ReadSessionMetaOptions) => undefined);
+    await fetchAgents({ runner, meta: true, metaReader });
+
+    expect(metaReader.mock.calls[0]?.[1]).toEqual({ contextLimit: undefined });
+  });
+
+  it('metaReader 未指定なら既定の読み取りを使う', async () => {
+    // 実在しない cwd なので transcript は見つからず、meta は undefined のまま返る
+    const missing = runnerReturning(
+      JSON.stringify([
+        { kind: 'interactive', sessionId: 'z', name: 'zeta', cwd: '/no/such/dir', status: 'idle' },
+      ]),
+    );
+    const result = await fetchAgents({ runner: missing, meta: true });
+
+    expect(result.ok && result.agents).toHaveLength(1);
+    expect(result.ok && result.agents[0]?.meta).toBeUndefined();
+  });
+
+  it('読み取りに失敗しても一覧は返る', async () => {
+    const metaReader = vi.fn(async () => undefined);
+    const result = await fetchAgents({ runner, meta: true, metaReader });
+
+    expect(result.ok && result.agents).toHaveLength(2);
+    expect(result.ok && result.agents[0]?.meta).toBeUndefined();
+  });
+});
+
+describe('起動元アプリ', () => {
+  const raw = [
+    { kind: 'interactive', sessionId: 'a', name: 'alpha', pid: 300, status: 'busy' },
+    { kind: 'background', sessionId: 'b', name: 'beta', id: 'b', state: 'blocked' },
+  ];
+  const psOutput = [
+    '300 200 claude',
+    '200 100 /bin/zsh',
+    '100 1 /Applications/iTerm.app/Contents/MacOS/iTerm2',
+  ].join('\n');
+
+  /** `claude` には一覧、`ps` にはプロセス表を返す。 */
+  const runnerWith = (ps: () => Promise<string>): CommandRunner =>
+    vi.fn(async (command: string) => (command === 'ps' ? ps() : JSON.stringify(raw)));
+
+  it('既定では ps を実行しない', async () => {
+    const runner = runnerWith(async () => psOutput);
+    const result = await fetchAgents({ runner });
+
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(result.ok && result.agents[0]?.launchApp).toBeUndefined();
+  });
+
+  it('有効にすると ps を 1 回だけ実行し、pid を持つセッションに合成する', async () => {
+    const runner = runnerWith(async () => psOutput);
+    const result = await fetchAgents({ runner, launchApp: true });
+
+    expect(runner).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(runner).mock.calls[1]?.slice(0, 2)).toEqual([
+      'ps',
+      ['-axo', 'pid=,ppid=,comm='],
+    ]);
+    expect(result.ok && result.agents.map((agent) => agent.launchApp)).toEqual([
+      'iTerm2',
+      undefined,
+    ]);
+  });
+
+  it('pid を持つセッションが無ければ ps を実行しない', async () => {
+    const runner: CommandRunner = vi.fn(async () => JSON.stringify([raw[1]]));
+    await fetchAgents({ runner, launchApp: true });
+
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
+
+  it('ps が失敗しても一覧は返る', async () => {
+    const runner = runnerWith(async () => {
+      throw new Error('ps failed');
+    });
+    const result = await fetchAgents({ runner, launchApp: true });
+
+    expect(result.ok && result.agents).toHaveLength(2);
+    expect(result.ok && result.agents[0]?.launchApp).toBeUndefined();
+  });
+
+  it('meta と同時に有効にできる', async () => {
+    const runner = runnerWith(async () => psOutput);
+    const metaReader = vi.fn(async () => undefined);
+    const result = await fetchAgents({ runner, launchApp: true, meta: true, metaReader });
+
+    expect(metaReader).toHaveBeenCalledTimes(2);
+    expect(result.ok && result.agents[0]?.launchApp).toBe('iTerm2');
+  });
+
+  describe('控え（launchAppCache）', () => {
+    it('判定済みのセッションだけなら ps を実行し直さない', async () => {
+      const runner = runnerWith(async () => psOutput);
+      const launchAppCache = createLaunchAppCache();
+
+      await fetchAgents({ runner, launchApp: true, launchAppCache });
+      const second = await fetchAgents({ runner, launchApp: true, launchAppCache });
+
+      const psCalls = vi.mocked(runner).mock.calls.filter(([command]) => command === 'ps');
+      expect(psCalls).toHaveLength(1);
+      expect(second.ok && second.agents[0]?.launchApp).toBe('iTerm2');
+    });
+
+    it('知らないセッションが現れたら ps を実行し、消えたセッションの控えは捨てる', async () => {
+      let listed: readonly object[] = raw;
+      const runner: CommandRunner = vi.fn(async (command: string) =>
+        command === 'ps'
+          ? [psOutput, '301 200 claude'].join('\n')
+          : JSON.stringify(listed),
+      );
+      const launchAppCache = createLaunchAppCache();
+
+      await fetchAgents({ runner, launchApp: true, launchAppCache });
+      listed = [{ kind: 'interactive', sessionId: 'c', name: 'gamma', pid: 301, status: 'busy' }];
+      const result = await fetchAgents({ runner, launchApp: true, launchAppCache });
+
+      const psCalls = vi.mocked(runner).mock.calls.filter(([command]) => command === 'ps');
+      expect(psCalls).toHaveLength(2);
+      expect(result.ok && result.agents[0]?.launchApp).toBe('iTerm2');
+      expect([...launchAppCache.keys()]).toEqual(['301:c']);
+    });
+
+    it('pid が同じでも別のセッションなら判定し直す', async () => {
+      let listed: readonly object[] = [raw[0] as object];
+      const runner = vi.fn(async (command: string) =>
+        command === 'ps' ? psOutput : JSON.stringify(listed),
+      );
+      const launchAppCache = createLaunchAppCache();
+
+      await fetchAgents({ runner, launchApp: true, launchAppCache });
+      listed = [{ kind: 'interactive', sessionId: 'other', name: 'other', pid: 300, status: 'busy' }];
+      await fetchAgents({ runner, launchApp: true, launchAppCache });
+
+      expect(runner.mock.calls.filter(([command]) => command === 'ps')).toHaveLength(2);
+    });
+
+    it('ps が失敗したら控えに残さず、次回に判定し直す', async () => {
+      let fail = true;
+      const runner = runnerWith(async () => {
+        if (fail) {
+          throw new Error('ps failed');
+        }
+        return psOutput;
+      });
+      const launchAppCache = createLaunchAppCache();
+
+      await fetchAgents({ runner, launchApp: true, launchAppCache });
+      expect(launchAppCache.size).toBe(0);
+      fail = false;
+      const result = await fetchAgents({ runner, launchApp: true, launchAppCache });
+
+      expect(result.ok && result.agents[0]?.launchApp).toBe('iTerm2');
+    });
+  });
+});
+
+describe('出力の見張り（observe）', () => {
+  const stdout = JSON.stringify([{ kind: 'interactive', sessionId: 'a', status: 'busy' }]);
+
+  it('受け取った出力と、配列として読んだものを渡す', async () => {
+    const observe = vi.fn();
+    const runner: CommandRunner = vi.fn(async () => stdout);
+    await fetchAgents({ runner, observe });
+    expect(observe).toHaveBeenCalledWith(stdout, JSON.parse(stdout));
+  });
+
+  it('見張りが例外を投げても一覧は返る', async () => {
+    const runner: CommandRunner = vi.fn(async () => stdout);
+    const result = await fetchAgents({
+      runner,
+      observe: () => {
+        throw new Error('boom');
+      },
+    });
+    expect(result.ok && result.agents).toHaveLength(1);
+  });
+
+  it('配列でない出力は見張りに渡さない', async () => {
+    const observe = vi.fn();
+    const runner: CommandRunner = vi.fn(async () => '{}');
+    await fetchAgents({ runner, observe });
+    expect(observe).not.toHaveBeenCalled();
+  });
+});
+
