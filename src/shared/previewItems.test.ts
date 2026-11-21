@@ -31,15 +31,38 @@ describe('extractPreviewItems', () => {
     expect(items[0]).toMatchObject({ edited: true, tool: 'Read' });
   });
 
-  it('会話に出た localhost の URL を拾う（外のサイトは WebFetch したものだけ）', () => {
+  it('会話に出た URL を拾う（localhost はツールの結果からも）', () => {
     const chunk = [
-      assistant([{ type: 'text', text: '開発サーバを http://localhost:5173/settings で起動しました。https://example.com は見ていません。' }]),
+      assistant([{ type: 'text', text: '開発サーバを http://localhost:5173/settings で起動しました。' }]),
       user([{ type: 'tool_result', tool_use_id: 't', content: 'Local: http://127.0.0.1:3000/' }]),
     ].join('\n');
     expect(extractPreviewItems(chunk).map(previewKey)).toEqual([
       'url:http://127.0.0.1:3000/',
       'url:http://localhost:5173/settings',
     ]);
+  });
+
+  it('人の依頼と Claude の返事に出た外の URL も拾う（日本語・句読点・Markdown で切る）', () => {
+    const chunk = [
+      JSON.stringify({ type: 'user', message: { role: 'user', content: 'https://www.wikipedia.orgを開いて' } }),
+      assistant([
+        {
+          type: 'text',
+          text: 'テストなら https://example.com がおすすめです。**https://info.cern.ch**、[資料](https://example.org/docs?a=1)。https:// だけは拾わない',
+        },
+      ]),
+    ].join('\n');
+    expect(extractPreviewItems(chunk).map(previewKey)).toEqual([
+      'url:https://example.org/docs?a=1',
+      'url:https://info.cern.ch',
+      'url:https://example.com',
+      'url:https://www.wikipedia.org',
+    ]);
+  });
+
+  it('ツールの結果（読んだファイルや取ってきたページ）に出た外の URL は拾わない', () => {
+    const chunk = user([{ type: 'tool_result', tool_use_id: 't', content: 'see https://evil.example/' }]);
+    expect(extractPreviewItems(chunk)).toEqual([]);
   });
 
   it('相対パス・サブエージェントの行・壊れた行は拾わない', () => {
