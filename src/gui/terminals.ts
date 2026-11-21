@@ -47,10 +47,13 @@ export interface TerminalManager {
   readonly close: (tabId: string) => void;
   readonly closeAll: () => void;
   readonly has: (tabId: string) => boolean;
+  /** そのタブで動かしているもの（会話の画面から送る先が、指揮役の attach かを確かめるため） */
+  readonly commandOf: (tabId: string) => TerminalCommand | undefined;
 }
 
 export const createTerminalManager = (options: TerminalManagerOptions): TerminalManager => {
   const ptys = new Map<string, Pty>();
+  const commands = new Map<string, TerminalCommand>();
 
   const close = (tabId: string): void => {
     const pty = ptys.get(tabId);
@@ -58,6 +61,7 @@ export const createTerminalManager = (options: TerminalManagerOptions): Terminal
       return;
     }
     ptys.delete(tabId);
+    commands.delete(tabId);
     pty.kill();
   };
 
@@ -77,6 +81,7 @@ export const createTerminalManager = (options: TerminalManagerOptions): Terminal
         },
       );
       ptys.set(tabId, pty);
+      commands.set(tabId, command);
       pty.onData((data) => {
         if (ptys.get(tabId) === pty) {
           options.onData(tabId, data);
@@ -85,6 +90,7 @@ export const createTerminalManager = (options: TerminalManagerOptions): Terminal
       pty.onExit(({ exitCode }) => {
         if (ptys.get(tabId) === pty) {
           ptys.delete(tabId);
+          commands.delete(tabId);
           options.onExit(tabId, exitCode);
         }
       });
@@ -104,5 +110,6 @@ export const createTerminalManager = (options: TerminalManagerOptions): Terminal
       }
     },
     has: (tabId) => ptys.has(tabId),
+    commandOf: (tabId) => commands.get(tabId),
   };
 };

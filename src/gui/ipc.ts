@@ -2,6 +2,7 @@ import type { ClaudeVersionCheck } from '../core/claudeVersion.js';
 import type { FetchAgentsResult } from '../core/fetchAgents.js';
 import type { ReadLedgerResult } from '../core/ledger.js';
 import type { PreviewContent } from '../core/previewContent.js';
+import type { ConversationEntry } from '../shared/conversation.js';
 import type { PreviewItem } from '../shared/previewItems.js';
 import type { LeaderStartup } from './leaderStartup.js';
 
@@ -49,7 +50,19 @@ export const IPC_CHANNELS = {
   openExternalUrl: 'preview:openExternal',
   /** 埋め込み端末で押されたファイル名・URL をプレビューに足す（セッションに出てきたものだけ） */
   openPreviewLink: 'preview:openLink',
+  /** セッションの会話（transcript を会話の並びに直したもの） */
+  getConversation: 'conversation:get',
+  /** 会話の画面から指揮役に送る（指揮役の端末へ書き込む） */
+  sendToLeader: 'conversation:sendToLeader',
 } as const;
+
+/** 指揮役の端末のタブの ID。指揮役は 1 人なので固定にする（会話の画面から送る先）。 */
+export const LEADER_TAB_ID = 'leader';
+
+/** 会話の画面から指揮役に送った結果。送らなかったときは理由（承認待ち・作業中など）。 */
+export type SendToLeaderResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: 'busy' | 'blocked' | 'unavailable' | 'invalid'; readonly message: string };
 
 /** 端末で押されたものをプレビューに足した結果。`key` はプレビューで開くときの鍵（previewKey）。 */
 export type OpenPreviewLinkResult =
@@ -143,6 +156,13 @@ export interface CuseBridge {
    * main がそのセッションの transcript に出てきたものか・ファイルがあるかを確かめる
    */
   readonly openPreviewLink: (sessionId: string, text: string, kind: 'url' | 'file') => Promise<OpenPreviewLinkResult>;
+  /** セッションの会話（人の依頼・返事・ツールの呼び出し。古い順） */
+  readonly getConversation: (sessionId: string) => Promise<readonly ConversationEntry[]>;
+  /**
+   * 会話の画面から指揮役に送る。main が指揮役の状態を確かめ、依頼を待っているときだけ端末へ書き込む
+   * （承認待ち・作業中は送らない。Enter が権限の確認への返事になってしまうため）
+   */
+  readonly sendToLeader: (text: string) => Promise<SendToLeaderResult>;
   /** 通知を押したときに開くセッションを受け取る。購読を解除する関数を返す */
   readonly onOpenSession: (listener: (sessionId: string) => void) => () => void;
   readonly openTrustTerminal: (

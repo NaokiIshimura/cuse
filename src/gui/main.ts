@@ -13,11 +13,13 @@ import { extractPreviewItems, previewKey, type PreviewItem } from '../shared/pre
 import { buildTranscriptPath } from '../shared/transcriptPath.js';
 import { findLastCwd } from '../shared/parseTranscript.js';
 import { resolveTerminalLink } from './previewLinks.js';
+import { sendToLeader } from './leaderInput.js';
+import { parseConversation, type ConversationEntry } from '../shared/conversation.js';
 import { readPreviewContent } from '../core/previewContent.js';
 import { readTail } from '../core/readOutput.js';
 import { execFileRunner } from '../core/runCommand.js';
 import type { Agent } from '../types/agent.js';
-import { runStart } from '../commands/start.js';
+import { INITIAL_LEADER_PROMPT, RESUME_LEADER_PROMPT, runStart } from '../commands/start.js';
 import { MAX_WORKERS } from '../config/defaults.js';
 import { createAgentsObserver } from '../core/agentsDebug.js';
 import { checkClaudeVersion, type ClaudeVersionCheck } from '../core/claudeVersion.js';
@@ -33,6 +35,8 @@ import {
   type OpenTerminalRequest,
   type OpenTerminalResult,
   type OpenPreviewLinkResult,
+  type SendToLeaderResult,
+  LEADER_TAB_ID,
   type CleanWorkersResult,
   type OpenTrustTerminalRequest,
   type PreviewResult,
@@ -244,6 +248,39 @@ const previewItemsOf = async (sessionId: string): Promise<PreviewItem[]> => {
   const clicked = (clickedItems.get(sessionId) ?? []).filter((item) => !keys.has(previewKey(item)));
   return [...clicked, ...extracted];
 };
+
+/** 会話の画面に出す並び。cuse が指揮役を起こしたときの指示は、人の依頼と見分ける。 */
+ipcMain.handle(IPC_CHANNELS.getConversation, async (_event, sessionId: unknown): Promise<ConversationEntry[]> => {
+  const { chunk } = await transcriptChunkOf(typeof sessionId === 'string' ? sessionId : '');
+  return parseConversation(chunk, { systemPrompts: [INITIAL_LEADER_PROMPT, RESUME_LEADER_PROMPT] });
+});
+
+/**
+ * 会話の画面から指揮役に送る。送る先は renderer から受け取らず、指揮役のタブ（LEADER_TAB_ID）が
+ * 台帳の指揮役に attach しているときだけ書き込む。承認待ち・作業中は送らない（leaderInput.ts）。
+ */
+ipcMain.handle(IPC_CHANNELS.sendToLeader, (_event, text: unknown): Promise<SendToLeaderResult> =>
+  sendToLeader(text, {
+    readState: async () => {
+      const [agents, ledger] = await Promise.all([fetchAgents({ all: true, home }), readLedger({ home })]);
+      const record = ledger.kind === 'ok' ? ledger.ledger.leader : null;
+      const command = terminals.commandOf(LEADER_TAB_ID);
+      const attachedShortId = command?.kind === 'attach' ? command.shortId : null;
+      if (record === null) {
+        return { leader: null, attachedShortId };
+      }
+      const agent = agents.ok ? agents.agents.find((candidate) => candidate.sessionId === record.sessionId) : undefined;
+      const shortId = agent?.id ?? record.shortId;
+      return {
+        leader: shortId === null ? null : { shortId, state: agent?.state ?? null },
+        attachedShortId,
+      };
+    },
+    write: (data) => {
+      terminals.write(LEADER_TAB_ID, data);
+    },
+  }),
+);
 
 ipcMain.handle(
   IPC_CHANNELS.openPreviewLink,

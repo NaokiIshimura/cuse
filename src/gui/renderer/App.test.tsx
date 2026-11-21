@@ -116,6 +116,8 @@ const makeBridge = (snapshot: Snapshot) => {
     readPreview: async () => ({ kind: 'unavailable', message: '' }),
     openExternalUrl: async () => true,
     openPreviewLink: async () => ({ ok: false, message: 'なし' }),
+    getConversation: async () => [],
+    sendToLeader: async () => ({ ok: true }),
     openTrustTerminal: async (request) => {
       trusted.push({ tabId: request.tabId });
       return { ok: true };

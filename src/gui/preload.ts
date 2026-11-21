@@ -54,6 +54,8 @@ const bridge: CuseBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.openExternalUrl, sessionId, url),
   openPreviewLink: (sessionId: string, text: string, kind: 'url' | 'file') =>
     ipcRenderer.invoke(IPC_CHANNELS.openPreviewLink, sessionId, text, kind),
+  getConversation: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.getConversation, sessionId),
+  sendToLeader: (text: string) => ipcRenderer.invoke(IPC_CHANNELS.sendToLeader, text),
   onOpenSession: (listener) => {
     const handler = (_event: IpcRendererEvent, sessionId: string) => {
       listener(sessionId);
