@@ -41,6 +41,7 @@ npm run gui:dev     # ビルドしてウィンドウを起動（cuse app と同�
 npm run gui:package # .app にパッケージ化（macOS。ad-hoc 署名まで行う）
 npm run copies:check -- <cc-park のディレクトリ>  # cc-park から写したファイルと写し元のずれ
 npm run icon        # assets/icon.svg からアプリアイコン（icon.icns / icon.png）を作り直す
+npm run demo:gif    # README 冒頭の docs/cuse.gif を撮り直す（先に npm run build。下の「README の GIF」）
 ```
 
 ## リリース
@@ -138,6 +139,20 @@ npm で入れた node-pty は `prebuilds/darwin-*/spawn-helper` の実行権限�
 右のプレビューは、transcript から拾ったもの（`src/shared/previewItems.ts`）と、中央の端末で押したファイル名・URL（`src/shared/terminalLinks.ts` で探し、main の `src/gui/previewLinks.ts` が transcript に出てきた文字列か・ファイルがあるかを確かめたもの）だけを開く。renderer は鍵（`previewKey`）を渡すだけで、
 main が読むたびに transcript を読み直して、そのセッションに出てきたものかを確かめる（任意のファイルを読ませない）。
 Web 表示は `<webview>` を `will-attach-webview` で隔離する（Node 連携なし・preload なし・`cuse-preview` の専用セッション領域・http(s) のみ・新しいウィンドウは開かない）。
+
+### README の GIF
+
+README 冒頭の `docs/cuse.gif` は `scripts/demo/record.mjs`（`npm run demo:gif`）で撮る。画面の見た目が変わったら撮り直す。
+本物の `claude` は呼ばない。ダミーの HOME に台帳・transcript・作業ディレクトリを置き、偽の `claude`
+（`scripts/demo/fake-claude.mjs`。`agents --json` は台本が書いた `state.json` を返す）を PATH の先頭に置いて動かす。
+台本（`scripts/demo/scenario.mjs`）は「配下 2 つが作業中 → 1 つが承認待ち → 1 つが終わり、指揮役が README を読んで右に出す」。
+撮るのは CDP の `Page.captureScreenshot` で、ImageMagick（`magick` か `convert`）で GIF にまとめる（cc-park と同じ）。
+
+- cuse は起動時にログインシェルへ PATH を聞く。本物のシェルだと本物の `claude` が先に見つかるおそれがあるので、いまの PATH をそのまま答える偽のシェルを `SHELL` に渡す
+- 指揮役には `pid` を持たせる（`isAlive`。無いと cuse が指揮役を起こし直そうとする）
+- 動いている配下は上限（3）より少なくする。上限に達すると上端に警告が出て紛れる
+- 画面に出るパスを短くしたいときは `--home` でダミーの HOME を選ぶ（例: `--home /Users/demo`。空のフォルダか、前に撮ったときのフォルダだけを使い、中身は作り直す）
+- Linux で撮るときは `xvfb-run -a` を前につけ、日本語のフォント（`fonts-noto-cjk` など）を入れ、`LANG=ja_JP.UTF-8` で動かす（中国語の字形にならないように）
 
 ### キャラクター（AA）
 
